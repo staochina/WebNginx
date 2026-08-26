@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="simple.min.css" />
+    <link href="img/wn.svg" rel="icon" type="image/svg+xml" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>WebNginx Settings</title>
+  </head>
+  <body>
+    <header>
+      <h1><img src="img/wn.svg" alt="" /> WebNginx</h1>
+      <p id="description"></p>
+    </header>
+
+    <main>
+      <h4>Server Rules</h4>
+      <p>
+        规则按 <code>server</code> 分组；每个表格一行对应一个
+        <code>location</code>。页面上的编辑需点击 <strong>Save and Sync</strong> 后才会真正生效。
+      </p>
+
+      <details class="help-panel">
+        <summary>操作与填写说明</summary>
+        <div class="help-body">
+          <nav class="help-toc" aria-label="说明目录">
+            <a href="#help-生效">何时生效</a>
+            <a href="#help-填写">填写语法</a>
+            <a href="#help-优先级">规则优先级</a>
+            <a href="#help-导入导出">导入 / 导出</a>
+            <a href="#help-跨域">跨域</a>
+            <a href="#help-调试">调试日志</a>
+            <a href="#help-示例">示例</a>
+          </nav>
+
+          <details class="help-section" id="help-生效" open>
+            <summary>1. 何时生效</summary>
+            <ul>
+              <li>
+                设置页内的新增、修改、删除、Active、拖动排序、<strong>Import</strong>
+                都只改编辑区；必须点 <strong>Save and Sync</strong> 才会写入并应用到浏览器。
+              </li>
+              <li>未保存就关闭设置页，上述改动会丢失。</li>
+              <li>
+                <strong>Debug Log</strong> 开关立即切换，与规则保存无关；不写入
+                storage，关闭设置页或 Service Worker 重启后恢复为关闭。
+              </li>
+              <li>
+                弹窗 <strong>Enable Active Rules</strong> 是全局总开关，会立刻启用/清空<strong>已保存</strong>的规则；与单条
+                Active 是两层控制。
+              </li>
+              <li><strong>Rule Preview</strong> 在 Save and Sync 成功后刷新。</li>
+            </ul>
+          </details>
+
+          <details class="help-section" id="help-填写">
+            <summary>2. 填写语法</summary>
+            <p class="help-subtitle">Location（匹配路径）</p>
+            <ul>
+              <li><code>/</code> — 前缀匹配该域名下所有路径</li>
+              <li><code>/api</code> — 前缀匹配 <code>/api</code> 开头的路径</li>
+              <li><code>~ ^https://example\\.com/(.*)$</code> — 区分大小写的正则</li>
+              <li><code>~* \\.png$</code> — 不区分大小写的正则</li>
+            </ul>
+            <p class="help-subtitle">Directives（每行一条，以 <code>;</code> 结尾）</p>
+            <ul>
+              <li>
+                <code>proxy_pass https://目标;</code> — 子资源 / XHR URL
+                重定向（保留路径；自动跳过 OPTIONS 并补 CORS）
+              </li>
+              <li>
+                <code>rewrite 正则 替换 last;</code> — 正则改写（可用
+                <code>break</code> / <code>last</code> / <code>redirect</code>）
+              </li>
+              <li><code>proxy_set_header 名称 值;</code> — 修改请求头</li>
+              <li><code>add_header 名称 值;</code> — 追加响应头</li>
+              <li><code>return 403;</code> / <code>return 444;</code> — 拦截请求</li>
+            </ul>
+          </details>
+
+          <details class="help-section" id="help-优先级">
+            <summary>3. 规则优先级</summary>
+            <ul>
+              <li>不是 nginx 原生择优（无 exact / <code>^~</code> / 最长前缀优先）。</li>
+              <li>
+                同一 server 内多条同时命中时：<strong>表格更下面的 Location 优先</strong>（可用
+                ⋮⋮ 拖动；需 Save and Sync 后生效）。
+              </li>
+              <li>建议把更具体的路径放在下面；Inactive 不参与竞争。</li>
+              <li>
+                一条 Location 同时含重定向/拦截与改 Header 时，可能生成多条浏览器规则，最终按
+                declarativeNetRequest 规则裁决。
+              </li>
+            </ul>
+          </details>
+
+          <details class="help-section" id="help-导入导出">
+            <summary>4. 导入 / 导出</summary>
+            <ul>
+              <li>
+                <strong>Export</strong>：下载当前编辑区为 nginx 风格
+                <code>.conf</code>（含 Active/Inactive；Inactive 写作
+                <code>inactive on;</code>）。会带上页面上尚未 Save 的修改。
+              </li>
+              <li>
+                <strong>Import</strong>：从 <code>.conf</code> /
+                <code>.txt</code> 载入并<strong>整体替换</strong>编辑区（不合并）；有内容时会确认。
+              </li>
+              <li>导入只更新预览，须再点 Save and Sync 才真正生效。</li>
+              <li>导入会校验语法；不支持的指令会失败。推荐使用本扩展导出的文件。</li>
+              <li>若只想备份已生效规则：先 Save and Sync，再 Export。</li>
+            </ul>
+          </details>
+
+          <details class="help-section" id="help-跨域">
+            <summary>5. 跨域（能力与限制）</summary>
+            <ul>
+              <li>
+                本扩展做浏览器侧 URL 重定向 / 改头，<strong>不是</strong>真正的 nginx
+                反向代理。
+              </li>
+              <li>
+                <code>proxy_pass</code> 会自动：① 不重定向 OPTIONS（避免 preflight 被跳转报错）；②
+                给目标响应补上 CORS 头（可用 <code>add_header</code> 覆盖）。
+              </li>
+              <li>
+                Location 与 <code>proxy_pass</code> 路径一致时会保留完整请求路径（例如
+                <code>/svr/otb/cube/...</code> → 目标同路径），不会截成固定前缀。
+              </li>
+              <li>浏览器仍会做 CORS 校验；带 Cookie 的请求可能需把
+                <code>Access-Control-Allow-Origin</code> 写成具体 Origin。</li>
+            </ul>
+          </details>
+
+          <details class="help-section" id="help-调试">
+            <summary>6. 调试日志</summary>
+            <ul>
+              <li>
+                工具栏 <strong>Debug Log</strong> 左右开关会立即切换（无需 Save and
+                Sync）。开启后才会在控制台打印 <code>[WebNginx]</code> 日志。
+              </li>
+              <li>
+                <strong>每次切换开关都会清空控制台</strong>：设置页控制台与
+                Service Worker 控制台各清除一次。
+              </li>
+              <li>
+                查看后台日志：打开
+                <code>chrome://extensions</code> → 本扩展 →「Service
+                Worker」/「检查视图」。
+              </li>
+              <li>
+                规则命中日志（<code>onRuleMatchedDebug</code>）通常仅在<strong>未打包</strong>的扩展上可用；正式商店安装版可能看不到命中明细。
+              </li>
+            </ul>
+          </details>
+
+          <details class="help-section" id="help-示例">
+            <summary>7. 配置示例</summary>
+            <div class="help-example">
+              <p>
+                <strong>跨站重定向</strong>：<code>server_name</code> =
+                <code>www.abcd.com</code>，Location = <code>/</code>，Directives =
+                <code>proxy_pass http://127.0.0.1:8080;</code>
+                （会自动处理 OPTIONS / CORS；Save and Sync 后生效）
+              </p>
+              <p>改完后点击 <strong>Save and Sync</strong>。</p>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      <div class="toolbar">
+        <button id="btn-add-server" type="button" class="btn btn-add">
+          Add Server
+        </button>
+        <button id="btn-save" type="button" class="btn btn-primary">
+          Save and Sync
+        </button>
+        <button id="btn-export" type="button" class="btn btn-export">
+          Export
+        </button>
+        <button id="btn-import" type="button" class="btn btn-import">
+          Import
+        </button>
+        <input
+          id="import-file"
+          type="file"
+          accept=".conf,.txt,.nginx,text/plain"
+          hidden
+        />
+        <div class="debug-panel">
+          <div class="debug-switch">
+            <span class="debug-switch-label" id="debug-log-label">Debug Log</span>
+            <button
+              id="btn-debug-log"
+              type="button"
+              class="switch"
+              role="switch"
+              aria-checked="false"
+              aria-labelledby="debug-log-label"
+              title="Toggle debug logging"
+            >
+              <span class="switch-track" aria-hidden="true">
+                <span class="switch-side">OFF</span>
+                <span class="switch-side">ON</span>
+                <span class="switch-thumb"></span>
+              </span>
+            </button>
+          </div>
+          <div id="debug-links" class="debug-links" hidden>
+            <span class="debug-links-hint">Open Service Worker console:</span>
+            <a
+              id="debug-link-extensions"
+              class="debug-link"
+              href="#"
+              title="Opens chrome://extensions — then click Service Worker"
+            ></a>
+          </div>
+        </div>
+      </div>
+
+      <div id="servers"></div>
+
+      <h4>Rule Preview</h4>
+      <p>Total: <span id="rule-num"></span></p>
+      <pre id="preview"></pre>
+    </main>
+    <footer>
+      Version: <span id="version"></span>
+    </footer>
+    <script type="module" src="option.js"></script>
+  </body>
+</html>

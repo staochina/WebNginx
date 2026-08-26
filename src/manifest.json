@@ -1,0 +1,35 @@
+{
+  "name": "WebNginx",
+  "description": "Nginx-style URL redirect and header rewrite for browser requests",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "icons": {
+    "16": "img/16.png",
+    "32": "img/32.png",
+    "48": "img/48.png",
+    "128": "img/128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "img/16.png",
+      "32": "img/32.png",
+      "48": "img/48.png"
+    }
+  },
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "declarativeNetRequestFeedback",
+    "storage"
+  ],
+  "options_ui": {
+    "page": "option.html",
+    "open_in_tab": true
+  },
+  "host_permissions": ["http://*/", "https://*/"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

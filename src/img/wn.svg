@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="WebNginx">
+  <defs>
+    <linearGradient id="bg" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#134e4a"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="11" fill="url(#bg)"/>
+  <!-- Geometric WN wordmark -->
+  <g fill="#ffffff">
+    <!-- W -->
+    <path d="M7.2 14.2h4.1l2.35 12.1 2.55-9.6h3.7l2.55 9.6 2.35-12.1h4.1L24.3 33.8h-4.2l-2.7-10.35L14.7 33.8h-4.2z"/>
+    <!-- N -->
+    <path d="M28.4 14.2h4.35l6.55 13.2V14.2H43v19.6h-4.35l-6.55-13.2v13.2H28.4z"/>
+  </g>
+</svg>
