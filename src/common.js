@@ -56,8 +56,8 @@ export function debugLog(...args) {
 }
 
 export const DEFAULT_NGINX_TEMPLATE = `# Nginx-style proxy rules for browser requests.
-# Supported: server/server_name, location, proxy_pass, proxy_set_header,
-# add_header, return 403|444, rewrite.
+# proxy_pass + server_name → transparent local MITM (chrome.proxy + native host).
+# rewrite / return / proxy_pass without server_name → declarativeNetRequest.
 # Sample location is inactive by default — enable Active and Save to apply.
 
 server {

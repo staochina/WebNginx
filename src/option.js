@@ -42,21 +42,18 @@ async function onload() {
   };
   document.getElementById('import-file').onchange = importRules;
 
-  const debugBtn = document.getElementById('btn-debug-log');
-  const debugLinks = document.getElementById('debug-links');
-  const debugExtLink = document.getElementById('debug-link-extensions');
-  const extensionsDebugUrl = `chrome://extensions/?id=${chrome.runtime.id}`;
-  debugExtLink.textContent = extensionsDebugUrl;
-  debugExtLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    chrome.tabs.create({ url: extensionsDebugUrl });
+  await refreshProxyStatus();
+  document.getElementById('btn-proxy-retry')?.addEventListener('click', () => {
+    refreshProxyStatus();
   });
-  syncDebugButton(debugBtn, debugLinks, false);
+
+  const debugBtn = document.getElementById('btn-debug-log');
+  syncDebugButton(debugBtn, false);
   debugBtn.addEventListener('click', async function () {
     const enabled = this.getAttribute('aria-checked') !== 'true';
     console.clear();
     setDebugEnabled(enabled);
-    syncDebugButton(this, debugLinks, enabled);
+    syncDebugButton(this, enabled);
     try {
       await chrome.runtime.sendMessage({
         action: 'setDebugLog',
@@ -98,12 +95,9 @@ function newLocation() {
   };
 }
 
-function syncDebugButton(btn, linksEl, enabled) {
+function syncDebugButton(btn, enabled) {
   btn.setAttribute('aria-checked', String(enabled));
   btn.classList.toggle('is-on', enabled);
-  if (linksEl) {
-    linksEl.hidden = !enabled;
-  }
 }
 
 function render() {
@@ -510,6 +504,87 @@ async function refreshPreview() {
     ruleNumSpan.textContent = 0;
   } else {
     previewPre.textContent = JSON.stringify(preview, null, 2);
-    ruleNumSpan.textContent = preview.length;
+    ruleNumSpan.textContent =
+      typeof preview?.length === 'number'
+        ? preview.length
+        : Array.isArray(preview)
+          ? preview.length
+          : 0;
+  }
+  await refreshProxyStatus();
+}
+
+async function refreshProxyStatus() {
+  const statusEl = document.getElementById('proxy-status');
+  const hintEl = document.getElementById('proxy-install-hint');
+  const badgeEl = document.getElementById('proxy-status-badge');
+  if (!statusEl || !hintEl) {
+    return;
+  }
+
+  const extId = chrome.runtime.id;
+  hintEl.textContent =
+    `Install native host (macOS):\n` +
+    `  make install-host EXT_ID=${extId}\n` +
+    `Trust local CA (after first connect):\n` +
+    `  make trust-ca\n` +
+    `Then fully quit Chrome (Cmd+Q) and reopen.\n` +
+    `Host name: com.webnginx.proxy`;
+
+  setProxyStatusBadge(badgeEl, 'unknown');
+  statusEl.textContent = 'Checking native host…';
+  try {
+    const { success, status, error } = await chrome.runtime.sendMessage({
+      action: 'getProxyStatus',
+    });
+    if (!success || !status) {
+      setProxyStatusBadge(badgeEl, 'off');
+      statusEl.textContent = `Proxy status unavailable${error ? `: ${error}` : ''}`;
+      return;
+    }
+
+    const on = !!(status.listening || status.running);
+    setProxyStatusBadge(badgeEl, on ? 'on' : 'off');
+
+    if (on) {
+      statusEl.textContent =
+        `Listening on 127.0.0.1:${status.listenPort}` +
+        (status.lastStatus?.caPath ? ` · CA ${status.lastStatus.caPath}` : '') +
+        (status.lastStatus?.routeCount != null
+          ? ` · routes ${status.lastStatus.routeCount}`
+          : '');
+      return;
+    }
+
+    if (status.hostInstalled) {
+      statusEl.textContent =
+        'Native host is installed, but proxy is not listening. ' +
+        'Turn the extension ON and Save and Sync a proxy_pass rule.';
+      return;
+    }
+
+    statusEl.textContent =
+      `Native host unavailable: ${status.error || status.lastError || 'not found'}. ` +
+      `Run: make install-host EXT_ID=${extId}, then Cmd+Q quit Chrome and reopen.`;
+  } catch (e) {
+    setProxyStatusBadge(badgeEl, 'off');
+    statusEl.textContent = `Proxy status error: ${e.message || e}`;
+  }
+}
+
+function setProxyStatusBadge(badgeEl, state) {
+  if (!badgeEl) {
+    return;
+  }
+  badgeEl.classList.remove('is-on', 'is-off', 'is-unknown');
+  if (state === 'on') {
+    badgeEl.classList.add('is-on');
+    badgeEl.textContent = 'ON';
+  } else if (state === 'off') {
+    badgeEl.classList.add('is-off');
+    badgeEl.textContent = 'OFF';
+  } else {
+    badgeEl.classList.add('is-unknown');
+    badgeEl.textContent = '…';
   }
 }

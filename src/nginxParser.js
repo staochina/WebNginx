@@ -28,14 +28,27 @@ const PROXY_PASS_CORS_HEADERS = [
   { header: 'Access-Control-Expose-Headers', operation: 'set', value: '*' },
 ];
 
+/** Host name used by chrome.proxy PAC / native messaging. */
+export const NATIVE_HOST_NAME = 'com.webnginx.proxy';
+
 /**
  * Parse nginx-style config into declarativeNetRequest rule objects.
  * @param {string} input
  * @returns {Array<object>}
  */
 export function parseNginxConfig(input) {
+  return parseWebNginxConfig(input).dnrRules;
+}
+
+/**
+ * Parse nginx-style config into DNR rules and transparent proxy routes.
+ * Locations with server_name + proxy_pass (no rewrite/return) become proxyRoutes.
+ * @param {string} input
+ * @returns {{ dnrRules: Array<object>, proxyRoutes: Array<object> }}
+ */
+export function parseWebNginxConfig(input) {
   if (!input || !input.trim()) {
-    return [];
+    return { dnrRules: [], proxyRoutes: [] };
   }
 
   const lines = stripComments(input).split('\n');
@@ -43,21 +56,83 @@ export function parseNginxConfig(input) {
   const root = parseBlock(lines, 0, { requireClose: false });
   const locations = flattenLocations(root.children);
 
-  const rules = [];
+  const dnrRules = [];
+  const proxyRoutes = [];
   let id = 0;
 
   for (const loc of locations) {
     if (loc.inactive) {
       continue;
     }
+
+    const route = tryExtractProxyRoute(loc);
+    if (route) {
+      proxyRoutes.push(route);
+      continue;
+    }
+
     const emitted = locationToRules(loc, () => {
       id += 1;
       return id;
     });
-    rules.push(...emitted);
+    dnrRules.push(...emitted);
   }
 
-  return rules;
+  return { dnrRules, proxyRoutes };
+}
+
+/**
+ * @param {object} location
+ * @returns {object|null}
+ */
+function tryExtractProxyRoute(location) {
+  if (!location.serverNames || location.serverNames.length === 0) {
+    return null;
+  }
+
+  const names = location.directives.map((d) => d.name);
+  if (!names.includes('proxy_pass')) {
+    return null;
+  }
+  // rewrite / return stay on the DNR path.
+  if (names.includes('rewrite') || names.includes('return')) {
+    return null;
+  }
+
+  const proxyPass = location.directives.find((d) => d.name === 'proxy_pass');
+  const upstream = unquote(proxyPass.args.join(' ').trim());
+  if (!upstream) {
+    throw new Error('proxy_pass requires a target URL');
+  }
+
+  const proxySetHeaders = [];
+  const addHeaders = [];
+  for (const directive of location.directives) {
+    if (directive.name === 'proxy_set_header') {
+      const h = parseHeaderDirective(directive.args, 'set');
+      proxySetHeaders.push({ header: h.header, value: h.value });
+    } else if (directive.name === 'add_header') {
+      const h = parseHeaderDirective(directive.args, 'append');
+      addHeaders.push({ header: h.header, value: h.value });
+    } else if (
+      directive.name !== 'proxy_pass' &&
+      directive.name !== 'inactive'
+    ) {
+      throw new Error(
+        `Unsupported directive '${directive.name}' in location ${location.pattern}`,
+      );
+    }
+  }
+
+  return {
+    serverNames: [...location.serverNames],
+    matchType: location.matchType,
+    pattern: location.pattern,
+    caseSensitive: location.caseSensitive !== false,
+    upstream,
+    proxySetHeaders,
+    addHeaders,
+  };
 }
 
 function stripComments(input) {

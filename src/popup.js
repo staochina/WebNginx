@@ -35,7 +35,7 @@ async function onload() {
         return;
       }
 
-      console.log(`Rule: ${response.preview.length}`);
+      console.log(`Rule: ${response.preview?.length ?? 0}`);
     } catch (e) {
       this.checked = !enabled;
       alert(`${e}`);

@@ -161,16 +161,43 @@
             <summary>7. 配置示例</summary>
             <div class="help-example">
               <p>
-                <strong>跨站重定向</strong>：<code>server_name</code> =
-                <code>www.abcd.com</code>，Location = <code>/</code>，Directives =
+                <strong>透明代理</strong>：带 <code>server_name</code> 的
+                <code>proxy_pass</code> 会走本地 MITM（地址栏保持原域名）。需先安装
+                Native Host 并信任本地 CA（见下方 Proxy status）。
+              </p>
+              <p>
+                <code>server_name</code> = <code>www.abcd.com</code>，Location =
+                <code>/</code>，Directives =
                 <code>proxy_pass http://127.0.0.1:8080;</code>
-                （会自动处理 OPTIONS / CORS；Save and Sync 后生效）
+              </p>
+              <p>
+                <strong>DNR 改写</strong>：无 <code>server_name</code> 的
+                <code>proxy_pass</code>、<code>rewrite</code>、<code>return</code>
+                仍走 declarativeNetRequest。
               </p>
               <p>改完后点击 <strong>Save and Sync</strong>。</p>
             </div>
           </details>
         </div>
       </details>
+
+      <section class="proxy-status-panel" aria-label="Transparent proxy status">
+        <div class="proxy-status-heading">
+          <h4>透明代理状态 · Proxy status</h4>
+          <span
+            id="proxy-status-badge"
+            class="proxy-status-badge is-unknown"
+            role="status"
+            aria-live="polite"
+            >…</span
+          >
+        </div>
+        <p id="proxy-status" class="proxy-status">Checking…</p>
+        <pre id="proxy-install-hint" class="proxy-install-hint"></pre>
+        <button id="btn-proxy-retry" type="button" class="btn btn-export">
+          Retry connect
+        </button>
+      </section>
 
       <div class="toolbar">
         <button id="btn-add-server" type="button" class="btn btn-add">
@@ -209,15 +236,6 @@
                 <span class="switch-thumb"></span>
               </span>
             </button>
-          </div>
-          <div id="debug-links" class="debug-links" hidden>
-            <span class="debug-links-hint">Open Service Worker console:</span>
-            <a
-              id="debug-link-extensions"
-              class="debug-link"
-              href="#"
-              title="Opens chrome://extensions — then click Service Worker"
-            ></a>
           </div>
         </div>
       </div>

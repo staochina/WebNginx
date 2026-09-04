@@ -4,7 +4,7 @@ import {
   parseConfigModel,
   serializeConfigModel,
 } from '../src/configModel.js';
-import { parseNginxConfig } from '../src/nginxParser.js';
+import { parseNginxConfig, parseWebNginxConfig } from '../src/nginxParser.js';
 
 test('parses servers into table model', () => {
   const config = `
@@ -58,9 +58,10 @@ test('round-trips inactive locations without applying them', () => {
   assert.equal(parsed[0].locations[1].active, true);
   assert.doesNotMatch(parsed[0].locations[0].body, /inactive/);
 
-  const rules = parseNginxConfig(nginx);
-  assert.equal(rules.length, 2);
-  assert.equal(rules[0].action.redirect.transform.host, 'api.example.com');
+  const { dnrRules, proxyRoutes } = parseWebNginxConfig(nginx);
+  assert.equal(dnrRules.length, 0);
+  assert.equal(proxyRoutes.length, 1);
+  assert.equal(proxyRoutes[0].upstream, 'https://api.example.com');
 });
 
 test('new location defaults are active when serialized without inactive', () => {
