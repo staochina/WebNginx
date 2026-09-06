@@ -41,16 +41,30 @@ server {
   ]);
 });
 
-test('proxy_pass without server_name still uses DNR redirect', () => {
+test('proxy_pass without server_name is rejected', () => {
   const config = `
 location ~ ^https://fonts\\.googleapis\\.com/(.*)$ {
     proxy_pass https://fonts.loli.net/\\1;
 }
 `;
-  const rules = parseNginxConfig(config);
-  const redirect = rules.find((r) => r.action.type === 'redirect');
-  assert.equal(redirect.condition.regexFilter, '^https://fonts\\.googleapis\\.com/(.*)$');
-  assert.equal(redirect.action.redirect.regexSubstitution, 'https://fonts.loli.net/\\1');
+  assert.throws(
+    () => parseWebNginxConfig(config),
+    /server_name is required/,
+  );
+});
+
+test('server block without server_name is rejected', () => {
+  assert.throws(
+    () =>
+      parseWebNginxConfig(`
+server {
+    location / {
+        return 403;
+    }
+}
+`),
+    /server block requires a non-empty server_name/,
+  );
 });
 
 test('proxy_pass keeps request path metadata on route', () => {
@@ -70,8 +84,11 @@ server {
 
 test('rewrite redirect still applies to main_frame', () => {
   const config = `
-location / {
-    rewrite ^https://old\\.com/(.*)$ https://new.com/\\1 break;
+server {
+    server_name old.com;
+    location / {
+        rewrite ^https://old\\.com/(.*)$ https://new.com/\\1 break;
+    }
 }
 `;
   const rules = parseNginxConfig(config);
@@ -95,8 +112,11 @@ server {
 
 test('parses rewrite directive', () => {
   const config = `
-location / {
-    rewrite ^https://old\\.com/(.*)$ https://new.com/\\1 break;
+server {
+    server_name old.com;
+    location / {
+        rewrite ^https://old\\.com/(.*)$ https://new.com/\\1 break;
+    }
 }
 `;
   const rules = parseNginxConfig(config);
@@ -128,10 +148,29 @@ test('throws on unsupported directive', () => {
   assert.throws(
     () =>
       parseNginxConfig(`
-location / {
-    unknown_directive on;
+server {
+    server_name example.com;
+    location / {
+        unknown_directive on;
+    }
 }
 `),
     /Unsupported directive 'unknown_directive'/,
   );
+});
+
+test('server_name + proxy_pass with rewrite falls back to DNR', () => {
+  const config = `
+server {
+    server_name fonts.googleapis.com;
+    location / {
+        rewrite ^https://fonts\\.googleapis\\.com/(.*)$ https://fonts.loli.net/\\1 break;
+        proxy_pass https://fonts.loli.net;
+    }
+}
+`;
+  const { dnrRules, proxyRoutes } = parseWebNginxConfig(config);
+  assert.equal(proxyRoutes.length, 0);
+  assert.ok(dnrRules.length >= 1);
+  assert.ok(dnrRules.some((r) => r.action.type === 'redirect'));
 });

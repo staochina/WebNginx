@@ -55,7 +55,11 @@ echo "Wrote ${MANIFEST_PATH}"
 echo "Allowed origin: chrome-extension://${EXT_ID}/"
 echo "Host wrapper: ${WRAPPER} -> ${NODE_BIN} ${HOST_JS}"
 echo
-echo "Next: trust the local CA (after first host run, or run make trust-ca):"
-echo "  make trust-ca"
+echo "Next (in order):"
+echo "  1. Reload the extension on chrome://extensions"
+echo "  2. Options: Active proxy_pass + popup ON + Save and Sync"
+echo "     (first Save creates ~/.webnginx/ca.crt — install-host does NOT)"
+echo "  3. make trust-ca"
+echo "  4. Cmd+Q quit Chrome fully, then reopen"
 echo
 echo "Reload the WebNginx extension, enable rules, and check Options → Proxy status."

@@ -1,10 +1,9 @@
 'use strict';
 
-import { debugLog } from './common.js';
+import { debugLog, getProxyPort, DEFAULT_PROXY_PORT } from './common.js';
 import { NATIVE_HOST_NAME } from './nginxParser.js';
 import { buildPacScript, hostsFromProxyRoutes } from './pac.js';
 
-export const DEFAULT_PROXY_PORT = 17890;
 const NATIVE_TIMEOUT_MS = 8000;
 
 /** @type {chrome.runtime.Port|null} */
@@ -76,11 +75,12 @@ export async function queryProxyStatus() {
   }
 
   const installed = await probeHostInstalled();
+  const configuredPort = await getProxyPort();
   return {
     connected: false,
     listening: false,
     running: false,
-    listenPort: DEFAULT_PROXY_PORT,
+    listenPort: configuredPort,
     lastStatus: installed.response || null,
     lastError: installed.error || lastError,
     hostInstalled: installed.ok,
@@ -130,12 +130,13 @@ export async function applyTransparentProxy(proxyRoutes) {
   }
 
   await ensureNativeConnected();
+  const configuredPort = await getProxyPort();
   const response = await sendNative({
     type: 'setRoutes',
     routes,
-    listenPort: DEFAULT_PROXY_PORT,
+    listenPort: configuredPort,
   });
-  listenPort = response.port || DEFAULT_PROXY_PORT;
+  listenPort = response.port || configuredPort;
   lastStatus = response;
   lastError = null;
 

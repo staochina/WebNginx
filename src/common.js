@@ -42,7 +42,32 @@ export async function setGlobalSwitch(value) {
   await chrome.storage.sync.set({ globalSwitch: value });
 }
 
-/** In-memory only (per JS context). Not written to chrome.storage. */
+export const DEFAULT_PROXY_PORT = 17890;
+
+export function parseProxyPort(value) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    throw new Error(`Invalid proxy port: ${value} (use 1–65535)`);
+  }
+  return n;
+}
+
+export async function getProxyPort() {
+  const data = await chrome.storage.sync.get({ proxyPort: DEFAULT_PROXY_PORT });
+  try {
+    return parseProxyPort(data.proxyPort);
+  } catch {
+    return DEFAULT_PROXY_PORT;
+  }
+}
+
+export async function setProxyPort(value) {
+  const port = parseProxyPort(value);
+  await chrome.storage.sync.set({ proxyPort: port });
+  return port;
+}
+
+/** Debug Mode: in-memory only (per JS context). When on, debugLog prints to console. */
 let debugEnabled = false;
 
 export function setDebugEnabled(value) {
@@ -55,10 +80,9 @@ export function debugLog(...args) {
   }
 }
 
-export const DEFAULT_NGINX_TEMPLATE = `# Nginx-style proxy rules for browser requests.
-# proxy_pass + server_name → transparent local MITM (chrome.proxy + native host).
-# rewrite / return / proxy_pass without server_name → declarativeNetRequest.
-# Sample location is inactive by default — enable Active and Save to apply.
+export const DEFAULT_NGINX_TEMPLATE = `# Nginx-style rules. server_name is required.
+# Pure proxy_pass → local MITM; rewrite/return/headers → DNR.
+# Sample location is inactive — enable Active and Save to apply.
 
 server {
     server_name www.abcd.com;

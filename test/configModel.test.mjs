@@ -74,3 +74,28 @@ test('new location defaults are active when serialized without inactive', () => 
   assert.doesNotMatch(nginx, /inactive/);
   assert.equal(parseNginxConfig(nginx).length, 1);
 });
+
+test('parseConfigModel rejects location without server block', () => {
+  assert.throws(
+    () =>
+      parseConfigModel(`
+location / {
+    return 403;
+}
+`),
+    /server_name is required/,
+  );
+});
+
+test('serializeConfigModel rejects empty server_name', () => {
+  assert.throws(
+    () =>
+      serializeConfigModel([
+        {
+          serverNames: [],
+          locations: [{ active: true, args: '/', body: 'return 403;' }],
+        },
+      ]),
+    /server_name is required/,
+  );
+});

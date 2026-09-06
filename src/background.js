@@ -46,12 +46,12 @@ if (chrome.declarativeNetRequest?.onRuleMatchedDebug) {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'setDebugLog') {
+  if (request.action === 'setDebug') {
     console.clear();
     setDebugEnabled(!!request.value);
     console.log(
       '[WebNginx]',
-      'Debug Log',
+      'Debug',
       request.value ? 'ON' : 'OFF',
       '(console cleared on toggle)',
     );

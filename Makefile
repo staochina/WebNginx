@@ -1,12 +1,14 @@
 .PHONY: build buildc test install-host trust-ca
 
-CHROME_DST = ../target/webnginx-chrome.zip
+
+TARGET_DIR = ./target
+CHROME_DST = webnginx-chrome.zip
 
 build: buildc test
 
 buildc:
-	rm -f $(CHROME_DST)
-	cd src && zip -r $(CHROME_DST) *
+	rm -f $(TARGET_DIR)/$(CHROME_DST) && mkdir -p $(TARGET_DIR)
+	cd src && zip -r ../$(TARGET_DIR)/$(CHROME_DST) .
 
 test:
 	node --test test/*.mjs

@@ -1,5 +1,15 @@
 'use strict';
 
+import {
+  stripComments,
+  parseBlock,
+  unquote,
+  parseDirectiveLine,
+  normalizeServerNames,
+  ERR_SERVER_NAME_IN_SERVER,
+  ERR_SERVER_NAME_WRAP_LOCATION,
+} from './nginxText.js';
+
 const RESOURCE_TYPES = [
   'main_frame',
   'sub_frame',
@@ -135,51 +145,6 @@ function tryExtractProxyRoute(location) {
   };
 }
 
-function stripComments(input) {
-  return input
-    .split('\n')
-    .map((line) => {
-      const hash = line.indexOf('#');
-      return hash >= 0 ? line.slice(0, hash) : line;
-    })
-    .join('\n');
-}
-
-function parseBlock(lines, startIndex, { requireClose = true } = {}) {
-  const children = [];
-  let i = startIndex;
-
-  while (i < lines.length) {
-    const line = lines[i].trim();
-    i += 1;
-
-    if (!line) {
-      continue;
-    }
-
-    if (line === '}') {
-      return { children, index: i };
-    }
-
-    const blockMatch = line.match(/^(\w+)\s*(.*)\{$/);
-    if (blockMatch) {
-      const [, type, args] = blockMatch;
-      const inner = parseBlock(lines, i);
-      i = inner.index;
-      children.push({ type, args: args.trim(), children: inner.children });
-      continue;
-    }
-
-    children.push({ type: 'directive', line });
-  }
-
-  if (!requireClose) {
-    return { children, index: i };
-  }
-
-  throw new Error('Unclosed block, missing "}"');
-}
-
 function flattenLocations(nodes, context = {}) {
   const locations = [];
 
@@ -190,15 +155,24 @@ function flattenLocations(nodes, context = {}) {
         if (child.type === 'directive') {
           const parsed = parseDirective(child.line);
           if (parsed.name === 'server_name') {
-            serverContext.serverNames = parsed.args.map(unquote);
+            serverContext.serverNames = normalizeServerNames(
+              parsed.args.map(unquote),
+            );
           }
         }
+      }
+      if (serverContext.serverNames.length === 0) {
+        throw new Error(ERR_SERVER_NAME_IN_SERVER);
       }
       locations.push(...flattenLocations(node.children, serverContext));
       continue;
     }
 
     if (node.type === 'location') {
+      const names = context.serverNames || [];
+      if (names.length === 0) {
+        throw new Error(ERR_SERVER_NAME_WRAP_LOCATION);
+      }
       locations.push(buildLocation(node, context));
     }
   }
@@ -250,62 +224,7 @@ function parseLocationMatch(args) {
 }
 
 function parseDirective(line) {
-  const trimmed = line.trim().replace(/;$/, '');
-  const parts = splitArgs(trimmed);
-  if (parts.length === 0) {
-    throw new Error(`Invalid directive: ${line}`);
-  }
-
-  return { name: parts[0], args: parts.slice(1), raw: line.trim() };
-}
-
-function splitArgs(line) {
-  const tokens = [];
-  let current = '';
-  let quote = null;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (quote) {
-      if (ch === quote) {
-        quote = null;
-      } else {
-        current += ch;
-      }
-      continue;
-    }
-
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-
-    if (/\s/.test(ch)) {
-      if (current) {
-        tokens.push(current);
-        current = '';
-      }
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (current) {
-    tokens.push(current);
-  }
-
-  return tokens;
-}
-
-function unquote(value) {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
+  return { ...parseDirectiveLine(line), raw: line.trim() };
 }
 
 function buildCondition(location, regexOverride) {

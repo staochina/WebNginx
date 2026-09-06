@@ -7,8 +7,16 @@ import {
   DEFAULT_NGINX_TEMPLATE,
   setDebugEnabled,
   debugLog,
+  getProxyPort,
+  setProxyPort,
+  parseProxyPort,
+  DEFAULT_PROXY_PORT,
 } from './common.js';
 import { parseConfigModel, serializeConfigModel } from './configModel.js';
+import {
+  requireServerNames,
+  ERR_SERVER_NAME_REQUIRED,
+} from './nginxText.js';
 
 /** @type {Array<{serverNames: string[], locations: Array<{active: boolean, args: string, body: string}>, collapsed?: boolean}>} */
 let servers = [];
@@ -47,7 +55,12 @@ async function onload() {
     refreshProxyStatus();
   });
 
-  const debugBtn = document.getElementById('btn-debug-log');
+  const proxyPortInput = document.getElementById('proxy-port');
+  if (proxyPortInput) {
+    proxyPortInput.value = String(await getProxyPort());
+  }
+
+  const debugBtn = document.getElementById('btn-debug');
   syncDebugButton(debugBtn, false);
   debugBtn.addEventListener('click', async function () {
     const enabled = this.getAttribute('aria-checked') !== 'true';
@@ -56,7 +69,7 @@ async function onload() {
     syncDebugButton(this, enabled);
     try {
       await chrome.runtime.sendMessage({
-        action: 'setDebugLog',
+        action: 'setDebug',
         value: enabled,
       });
     } catch (e) {
@@ -64,7 +77,7 @@ async function onload() {
     }
     console.log(
       '[WebNginx]',
-      'Debug Log',
+      'Debug',
       enabled ? 'ON' : 'OFF',
       '(consoles cleared; also check Service Worker)',
     );
@@ -155,6 +168,7 @@ function renderServerGroup(server, serverIndex) {
   nameInput.className = 'server-name-input';
   nameInput.value = (server.serverNames || []).join(' ');
   nameInput.placeholder = 'example.com';
+  nameInput.required = true;
   nameInput.onchange = () => {
     server.serverNames = nameInput.value
       .trim()
@@ -360,10 +374,23 @@ function bindLocationRowDrag(tbody, server) {
 
 async function save() {
   syncDomToModel();
+  try {
+    assertServersHaveServerName(servers);
+  } catch (e) {
+    alert(`${e.message || e}`);
+    return;
+  }
   const nginx = serializeConfigModel(servers);
   debugLog('Save and Sync', { serverCount: servers.length, bytes: nginx.length });
 
   try {
+    const portInput = document.getElementById('proxy-port');
+    const port = parseProxyPort(portInput?.value ?? DEFAULT_PROXY_PORT);
+    await setProxyPort(port);
+    if (portInput) {
+      portInput.value = String(port);
+    }
+
     const { success, preview, error } = await chrome.runtime.sendMessage({
       action: 'updateDynamicRules',
       input: nginx,
@@ -378,7 +405,8 @@ async function save() {
     const ruleNumSpan = document.getElementById('rule-num');
     previewPre.textContent = JSON.stringify(preview, null, 2);
     ruleNumSpan.textContent = preview.length;
-    debugLog('Save and Sync ok', { ruleCount: preview.length });
+    debugLog('Save and Sync ok', { ruleCount: preview.length, proxyPort: port });
+    await refreshProxyStatus();
     alert(`Succeed, ${preview.length} rules saved!`);
   } catch (e) {
     alert(`${e}`);
@@ -387,6 +415,12 @@ async function save() {
 
 function exportRules() {
   syncDomToModel();
+  try {
+    assertServersHaveServerName(servers);
+  } catch (e) {
+    alert(`${e.message || e}`);
+    return;
+  }
   const nginx = serializeConfigModel(servers);
   const blob = new Blob([nginx], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -410,6 +444,7 @@ async function importRules(event) {
   try {
     const text = await file.text();
     const imported = parseConfigModel(text);
+    assertServersHaveServerName(imported);
     debugLog('import parse', {
       file: file.name,
       serverCount: imported.length,
@@ -441,7 +476,20 @@ async function importRules(event) {
       `Imported ${servers.length} server group(s). Click Save and Sync to apply.`,
     );
   } catch (e) {
-    alert(`Import failed: ${e}`);
+    alert(`Import failed: ${e.message || e}`);
+  }
+}
+
+/** @param {Array<{serverNames?: string[]}>} list */
+function assertServersHaveServerName(list) {
+  for (let i = 0; i < list.length; i += 1) {
+    try {
+      requireServerNames(list[i].serverNames, ERR_SERVER_NAME_REQUIRED);
+    } catch {
+      throw new Error(
+        `${ERR_SERVER_NAME_REQUIRED} (server group ${i + 1} is empty)`,
+      );
+    }
   }
 }
 
@@ -523,53 +571,89 @@ async function refreshProxyStatus() {
   }
 
   const extId = chrome.runtime.id;
-  hintEl.textContent =
-    `Install native host (macOS):\n` +
-    `  make install-host EXT_ID=${extId}\n` +
-    `Trust local CA (after first connect):\n` +
-    `  make trust-ca\n` +
-    `Then fully quit Chrome (Cmd+Q) and reopen.\n` +
-    `Host name: com.webnginx.proxy`;
+  const installGuide =
+    `从零安装（macOS），按顺序：\n` +
+    `1. chrome://extensions → 加载已解压的扩展程序 → 选 src/\n` +
+    `2. 复制扩展 ID\n` +
+    `3. make install-host EXT_ID=${extId}\n` +
+    `   （只注册 Native Messaging，不会生成 CA）\n` +
+    `4. 在 chrome://extensions 重新加载本扩展\n` +
+    `5. 本页：勾选 Active 的 proxy_pass + 弹窗总开关开启 + Save and Sync\n` +
+    `   （首次 Save 会生成 ~/.webnginx/ca.crt）\n` +
+    `6. make trust-ca\n` +
+    `7. Cmd+Q 完全退出 Chrome 后再打开\n` +
+    `Host 名：com.webnginx.proxy`;
 
   setProxyStatusBadge(badgeEl, 'unknown');
-  statusEl.textContent = 'Checking native host…';
+  statusEl.textContent = '正在检查 Native Host…';
   try {
     const { success, status, error } = await chrome.runtime.sendMessage({
       action: 'getProxyStatus',
     });
     if (!success || !status) {
       setProxyStatusBadge(badgeEl, 'off');
-      statusEl.textContent = `Proxy status unavailable${error ? `: ${error}` : ''}`;
+      hintEl.textContent = installGuide;
+      statusEl.textContent = `无法获取代理状态${error ? `：${localizeNativeError(error)}` : ''}`;
       return;
     }
 
-    const on = !!(status.listening || status.running);
-    setProxyStatusBadge(badgeEl, on ? 'on' : 'off');
+    const listening = !!(status.listening || status.running);
+    setProxyStatusBadge(badgeEl, listening ? 'on' : 'off');
 
-    if (on) {
+    // Listening: never show the "Native Host 不可用" install-host error.
+    if (listening) {
+      hintEl.textContent =
+        `连接正常，代理已在监听。\n` +
+        `如需重装 Host 或信任 CA，可展开下方安装说明。\n\n` +
+        installGuide;
       statusEl.textContent =
-        `Listening on 127.0.0.1:${status.listenPort}` +
+        `正在监听 127.0.0.1:${status.listenPort}` +
         (status.lastStatus?.caPath ? ` · CA ${status.lastStatus.caPath}` : '') +
         (status.lastStatus?.routeCount != null
-          ? ` · routes ${status.lastStatus.routeCount}`
+          ? ` · 路由 ${status.lastStatus.routeCount}`
           : '');
       return;
     }
 
-    if (status.hostInstalled) {
+    hintEl.textContent = installGuide;
+
+    if (status.hostInstalled || status.connected) {
       statusEl.textContent =
-        'Native host is installed, but proxy is not listening. ' +
-        'Turn the extension ON and Save and Sync a proxy_pass rule.';
+        'Native Host 已安装，但代理尚未监听。请打开弹窗总开关，并 Save and Sync 一条 proxy_pass 规则。';
       return;
     }
 
+    const detail = localizeNativeError(
+      status.error || status.lastError || '未找到',
+    );
     statusEl.textContent =
-      `Native host unavailable: ${status.error || status.lastError || 'not found'}. ` +
-      `Run: make install-host EXT_ID=${extId}, then Cmd+Q quit Chrome and reopen.`;
+      `Native Host 不可用：${detail}。` +
+      `请在webnginx-native安装目录执行：make install-host EXT_ID=${extId}，` +
+      `然后在 chrome://extensions 重新加载扩展；若仍失败，Cmd+Q 完全退出 Chrome 后再打开。`;
   } catch (e) {
     setProxyStatusBadge(badgeEl, 'off');
-    statusEl.textContent = `Proxy status error: ${e.message || e}`;
+    hintEl.textContent = installGuide;
+    statusEl.textContent = `代理状态出错：${localizeNativeError(e.message || e)}`;
   }
+}
+
+/** Map common Chrome native-messaging errors to Chinese. */
+function localizeNativeError(raw) {
+  const text = String(raw || '').trim();
+  if (!text) {
+    return '未知错误';
+  }
+  const lower = text.toLowerCase();
+  if (lower.includes('forbidden')) {
+    return '当前扩展无权访问该 Native Host（扩展 ID 与 install-host 绑定不一致）';
+  }
+  if (lower.includes('not found') || lower.includes('specified native messaging host')) {
+    return '未找到 Native Host（尚未安装或 Host 名不匹配）';
+  }
+  if (lower.includes('native host has exited') || lower.includes('host has exited')) {
+    return 'Native Host 已退出';
+  }
+  return text;
 }
 
 function setProxyStatusBadge(badgeEl, state) {

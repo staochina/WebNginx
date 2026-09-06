@@ -1,6 +1,6 @@
 {
   "name": "WebNginx",
-  "description": "Nginx-style transparent proxy, URL rewrite, and header rules for browser requests",
+  "description": "面向浏览器请求的 Nginx 风格透明反向代理、URL 改写与 Header 规则",
   "version": "1.1.0",
   "manifest_version": 3,
   "icons": {

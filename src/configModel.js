@@ -1,5 +1,17 @@
 'use strict';
 
+import {
+  stripComments,
+  parseBlock,
+  unquote,
+  parseDirectiveLine,
+  normalizeServerNames,
+  requireServerNames,
+  ERR_SERVER_NAME_IN_SERVER,
+  ERR_SERVER_NAME_WRAP_LOCATION,
+  ERR_SERVER_NAME_REQUIRED,
+} from './nginxText.js';
+
 /**
  * Parse nginx-style text into a UI-friendly server/location model.
  * @param {string} input
@@ -10,21 +22,16 @@ export function parseConfigModel(input) {
     return [];
   }
 
-  const lines = stripCommentsKeepInactive(input).split('\n');
+  const lines = stripComments(input).split('\n');
   const root = parseBlock(lines, 0, { requireClose: false });
   const servers = [];
-  const globalLocations = [];
 
   for (const node of root.children) {
     if (node.type === 'server') {
       servers.push(serverFromNode(node));
     } else if (node.type === 'location') {
-      globalLocations.push(locationFromNode(node));
+      throw new Error(ERR_SERVER_NAME_WRAP_LOCATION);
     }
-  }
-
-  if (globalLocations.length > 0) {
-    servers.unshift({ serverNames: [], locations: globalLocations });
   }
 
   return servers;
@@ -40,14 +47,11 @@ export function serializeConfigModel(servers) {
   const chunks = [];
 
   for (const server of servers) {
-    const names = (server.serverNames || []).map((n) => n.trim()).filter(Boolean);
+    const names = requireServerNames(
+      server.serverNames,
+      ERR_SERVER_NAME_REQUIRED,
+    );
     const locations = server.locations || [];
-    if (names.length === 0) {
-      for (const loc of locations) {
-        chunks.push(formatLocation(loc));
-      }
-      continue;
-    }
 
     const lines = ['server {'];
     lines.push(`    server_name ${names.join(' ')};`);
@@ -69,14 +73,17 @@ function serverFromNode(node) {
     if (child.type === 'directive') {
       const parsed = parseDirectiveLine(child.line);
       if (parsed.name === 'server_name') {
-        serverNames.push(...parsed.args.map(unquote));
+        serverNames.push(...normalizeServerNames(parsed.args.map(unquote)));
       }
     } else if (child.type === 'location') {
       locations.push(locationFromNode(child));
     }
   }
 
-  return { serverNames, locations };
+  return {
+    serverNames: requireServerNames(serverNames, ERR_SERVER_NAME_IN_SERVER),
+    locations,
+  };
 }
 
 function locationFromNode(node) {
@@ -131,107 +138,4 @@ function indentBlock(text, spaces) {
     .split('\n')
     .map((line) => (line ? pad + line : line))
     .join('\n');
-}
-
-function stripCommentsKeepInactive(input) {
-  return input
-    .split('\n')
-    .map((line) => {
-      const hash = line.indexOf('#');
-      return hash >= 0 ? line.slice(0, hash) : line;
-    })
-    .join('\n');
-}
-
-function parseBlock(lines, startIndex, { requireClose = true } = {}) {
-  const children = [];
-  let i = startIndex;
-
-  while (i < lines.length) {
-    const line = lines[i].trim();
-    i += 1;
-
-    if (!line) {
-      continue;
-    }
-
-    if (line === '}') {
-      return { children, index: i };
-    }
-
-    const blockMatch = line.match(/^(\w+)\s*(.*)\{$/);
-    if (blockMatch) {
-      const [, type, args] = blockMatch;
-      const inner = parseBlock(lines, i);
-      i = inner.index;
-      children.push({ type, args: args.trim(), children: inner.children });
-      continue;
-    }
-
-    children.push({ type: 'directive', line });
-  }
-
-  if (!requireClose) {
-    return { children, index: i };
-  }
-
-  throw new Error('Unclosed block, missing "}"');
-}
-
-function parseDirectiveLine(line) {
-  const trimmed = line.trim().replace(/;$/, '');
-  const parts = splitArgs(trimmed);
-  if (parts.length === 0) {
-    throw new Error(`Invalid directive: ${line}`);
-  }
-  return { name: parts[0], args: parts.slice(1) };
-}
-
-function splitArgs(line) {
-  const tokens = [];
-  let current = '';
-  let quote = null;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (quote) {
-      if (ch === quote) {
-        quote = null;
-      } else {
-        current += ch;
-      }
-      continue;
-    }
-
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-
-    if (/\s/.test(ch)) {
-      if (current) {
-        tokens.push(current);
-        current = '';
-      }
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (current) {
-    tokens.push(current);
-  }
-
-  return tokens;
-}
-
-function unquote(value) {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
 }

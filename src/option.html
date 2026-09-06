@@ -19,184 +19,216 @@
     <main>
       <h4>Server Rules</h4>
       <p>
-        规则按 <code>server</code> 分组；每个表格一行对应一个
-        <code>location</code>。页面上的编辑需点击 <strong>Save and Sync</strong> 后才会真正生效。
+        规则按 <code>server</code> 分组；<code>server_name</code> 必填；每行一个
+        <code>location</code>。须 <strong>Save and Sync</strong> 后生效。完整说明见
+        <a
+          href="https://github.com/staochina/WebNginx"
+          target="_blank"
+          rel="noopener noreferrer"
+          >README</a
+        >。
       </p>
+
+      <details class="help-panel">
+        <summary>工作原理</summary>
+        <div class="help-body">
+          <ul>
+            <li>
+              <strong>MITM 透明代理</strong>：纯 <code>proxy_pass</code>（无
+              <code>rewrite</code>/<code>return</code>）→ PAC + 本地 Native Host；地址栏域名不变。
+            </li>
+            <li>
+              <strong>DNR</strong>：<code>rewrite</code> / <code>return</code> / 纯改
+              Header，或同 Location 把 <code>proxy_pass</code> 与
+              <code>rewrite</code>/<code>return</code> 写在一起 → 退回浏览器侧规则。
+            </li>
+            <li>
+              每个 <code>server</code> 必须有非空 <code>server_name</code>；弹窗总开关关闭会清空
+              DNR 与 PAC。
+            </li>
+          </ul>
+        </div>
+      </details>
 
       <details class="help-panel">
         <summary>操作与填写说明</summary>
         <div class="help-body">
-          <nav class="help-toc" aria-label="说明目录">
-            <a href="#help-生效">何时生效</a>
-            <a href="#help-填写">填写语法</a>
-            <a href="#help-优先级">规则优先级</a>
-            <a href="#help-导入导出">导入 / 导出</a>
-            <a href="#help-跨域">跨域</a>
-            <a href="#help-调试">调试日志</a>
-            <a href="#help-示例">示例</a>
-          </nav>
+          <ul>
+            <li>
+              编辑 / Import 只改本页；必须 <strong>Save and Sync</strong>。未保存关闭会丢失。
+            </li>
+            <li>
+              <code>server_name</code> 必填（可空格写多个域名）。Location：前缀
+              <code>/</code>、<code>/api</code>，或正则 <code>~</code> /
+              <code>~*</code>。
+            </li>
+            <li>
+              指令：<code>proxy_pass</code>、<code>rewrite</code>、
+              <code>proxy_set_header</code>、<code>add_header</code>、
+              <code>return 403|444</code>（每行以 <code>;</code> 结尾）。
+            </li>
+            <li>
+              同 server 内<strong>更靠下</strong>的 Location 优先（可拖动 ⋮⋮）。Inactive 不参与。
+            </li>
+            <li>
+              Export / Import 使用 nginx 风格 <code>.conf</code>；Import 整体替换编辑区。
+            </li>
+            <li>
+              <strong>Debug</strong> 立即开关，只打控制台 <code>[WebNginx]</code> 日志，不落盘。
+            </li>
+            <li>
+              示例：<code>server_name www.abcd.com</code> +
+              <code>proxy_pass http://127.0.0.1:8080;</code> → MITM（需 Host / CA，见下一栏）。
+            </li>
+          </ul>
+        </div>
+      </details>
 
-          <details class="help-section" id="help-生效" open>
-            <summary>1. 何时生效</summary>
-            <ul>
-              <li>
-                设置页内的新增、修改、删除、Active、拖动排序、<strong>Import</strong>
-                都只改编辑区；必须点 <strong>Save and Sync</strong> 才会写入并应用到浏览器。
-              </li>
-              <li>未保存就关闭设置页，上述改动会丢失。</li>
-              <li>
-                <strong>Debug Log</strong> 开关立即切换，与规则保存无关；不写入
-                storage，关闭设置页或 Service Worker 重启后恢复为关闭。
-              </li>
-              <li>
-                弹窗 <strong>Enable Active Rules</strong> 是全局总开关，会立刻启用/清空<strong>已保存</strong>的规则；与单条
-                Active 是两层控制。
-              </li>
-              <li><strong>Rule Preview</strong> 在 Save and Sync 成功后刷新。</li>
-            </ul>
-          </details>
+      <details class="help-panel">
+        <summary>本地 Host 与 CA（从零安装）</summary>
+        <div class="help-body">
+          <p>
+            仅 MITM（透明 <code>proxy_pass</code>）需要 Host / CA；纯 DNR 只需加载扩展。下面按顺序做，命令在webnginx-native安装目录执行。
+          </p>
+          <ol>
+            <li>
+              Chrome 打开 <code>chrome://extensions</code> → 开发者模式 →「加载已解压的扩展程序」→ 选
+              <code>src/</code>（或 <code>make buildc</code> 后解压 zip）。
+            </li>
+            <li>复制该扩展的 <strong>ID</strong>。</li>
+            <li>
+              终端：<code>make install-host EXT_ID=你的ID</code>（只装 Native Messaging，
+              <strong>不</strong>生成 CA、不写钥匙串）。
+            </li>
+            <li>回到 <code>chrome://extensions</code>，点 WebNginx <strong>重新加载</strong>。</li>
+            <li>
+              打开本页（Options）：添加 server，填 <code>server_name</code>，Active 勾选，写纯
+              <code>proxy_pass …;</code>（同条不要再写 <code>rewrite</code>/<code>return</code>）。
+            </li>
+            <li>
+              弹窗打开总开关 <strong>Enable Active Rules</strong>，再点
+              <strong>Save and Sync</strong> → host 启动并<strong>首次</strong>生成
+              <code>~/.webnginx/ca.crt</code> / <code>ca.key</code>。
+            </li>
+            <li>
+              终端：<code>make trust-ca</code>（把 CA 写入登录钥匙串；需本机密码）。
+            </li>
+            <li>
+              <strong>Cmd+Q</strong> 完全退出 Chrome 再打开（只关窗口不够）。
+            </li>
+            <li>
+              本页下方徽章应为 <strong>ON</strong>；再访问配置的域名验证。
+            </li>
+          </ol>
+          <ul>
+            <li>
+              扩展 ID 变更后须重跑 <code>install-host</code> 并重新加载扩展；删过
+              <code>~/.webnginx/</code> 或换机后须再 Save 生成 CA，再
+              <code>trust-ca</code> + Cmd+Q。改端口不必重生证书。
+            </li>
+            <li>
+              叶证书只在 host 内存；完整说明与排错见
+              <a
+                href="https://github.com/staochina/WebNginx#从零安装macos新手顺序"
+                target="_blank"
+                rel="noopener noreferrer"
+                >README</a
+              >。
+            </li>
+          </ul>
+        </div>
+      </details>
 
-          <details class="help-section" id="help-填写">
-            <summary>2. 填写语法</summary>
-            <p class="help-subtitle">Location（匹配路径）</p>
-            <ul>
-              <li><code>/</code> — 前缀匹配该域名下所有路径</li>
-              <li><code>/api</code> — 前缀匹配 <code>/api</code> 开头的路径</li>
-              <li><code>~ ^https://example\\.com/(.*)$</code> — 区分大小写的正则</li>
-              <li><code>~* \\.png$</code> — 不区分大小写的正则</li>
-            </ul>
-            <p class="help-subtitle">Directives（每行一条，以 <code>;</code> 结尾）</p>
-            <ul>
-              <li>
-                <code>proxy_pass https://目标;</code> — 子资源 / XHR URL
-                重定向（保留路径；自动跳过 OPTIONS 并补 CORS）
-              </li>
-              <li>
-                <code>rewrite 正则 替换 last;</code> — 正则改写（可用
-                <code>break</code> / <code>last</code> / <code>redirect</code>）
-              </li>
-              <li><code>proxy_set_header 名称 值;</code> — 修改请求头</li>
-              <li><code>add_header 名称 值;</code> — 追加响应头</li>
-              <li><code>return 403;</code> / <code>return 444;</code> — 拦截请求</li>
-            </ul>
-          </details>
-
-          <details class="help-section" id="help-优先级">
-            <summary>3. 规则优先级</summary>
-            <ul>
-              <li>不是 nginx 原生择优（无 exact / <code>^~</code> / 最长前缀优先）。</li>
-              <li>
-                同一 server 内多条同时命中时：<strong>表格更下面的 Location 优先</strong>（可用
-                ⋮⋮ 拖动；需 Save and Sync 后生效）。
-              </li>
-              <li>建议把更具体的路径放在下面；Inactive 不参与竞争。</li>
-              <li>
-                一条 Location 同时含重定向/拦截与改 Header 时，可能生成多条浏览器规则，最终按
-                declarativeNetRequest 规则裁决。
-              </li>
-            </ul>
-          </details>
-
-          <details class="help-section" id="help-导入导出">
-            <summary>4. 导入 / 导出</summary>
-            <ul>
-              <li>
-                <strong>Export</strong>：下载当前编辑区为 nginx 风格
-                <code>.conf</code>（含 Active/Inactive；Inactive 写作
-                <code>inactive on;</code>）。会带上页面上尚未 Save 的修改。
-              </li>
-              <li>
-                <strong>Import</strong>：从 <code>.conf</code> /
-                <code>.txt</code> 载入并<strong>整体替换</strong>编辑区（不合并）；有内容时会确认。
-              </li>
-              <li>导入只更新预览，须再点 Save and Sync 才真正生效。</li>
-              <li>导入会校验语法；不支持的指令会失败。推荐使用本扩展导出的文件。</li>
-              <li>若只想备份已生效规则：先 Save and Sync，再 Export。</li>
-            </ul>
-          </details>
-
-          <details class="help-section" id="help-跨域">
-            <summary>5. 跨域（能力与限制）</summary>
-            <ul>
-              <li>
-                本扩展做浏览器侧 URL 重定向 / 改头，<strong>不是</strong>真正的 nginx
-                反向代理。
-              </li>
-              <li>
-                <code>proxy_pass</code> 会自动：① 不重定向 OPTIONS（避免 preflight 被跳转报错）；②
-                给目标响应补上 CORS 头（可用 <code>add_header</code> 覆盖）。
-              </li>
-              <li>
-                Location 与 <code>proxy_pass</code> 路径一致时会保留完整请求路径（例如
-                <code>/svr/otb/cube/...</code> → 目标同路径），不会截成固定前缀。
-              </li>
-              <li>浏览器仍会做 CORS 校验；带 Cookie 的请求可能需把
-                <code>Access-Control-Allow-Origin</code> 写成具体 Origin。</li>
-            </ul>
-          </details>
-
-          <details class="help-section" id="help-调试">
-            <summary>6. 调试日志</summary>
-            <ul>
-              <li>
-                工具栏 <strong>Debug Log</strong> 左右开关会立即切换（无需 Save and
-                Sync）。开启后才会在控制台打印 <code>[WebNginx]</code> 日志。
-              </li>
-              <li>
-                <strong>每次切换开关都会清空控制台</strong>：设置页控制台与
-                Service Worker 控制台各清除一次。
-              </li>
-              <li>
-                查看后台日志：打开
-                <code>chrome://extensions</code> → 本扩展 →「Service
-                Worker」/「检查视图」。
-              </li>
-              <li>
-                规则命中日志（<code>onRuleMatchedDebug</code>）通常仅在<strong>未打包</strong>的扩展上可用；正式商店安装版可能看不到命中明细。
-              </li>
-            </ul>
-          </details>
-
-          <details class="help-section" id="help-示例">
-            <summary>7. 配置示例</summary>
-            <div class="help-example">
-              <p>
-                <strong>透明代理</strong>：带 <code>server_name</code> 的
-                <code>proxy_pass</code> 会走本地 MITM（地址栏保持原域名）。需先安装
-                Native Host 并信任本地 CA（见下方 Proxy status）。
-              </p>
-              <p>
-                <code>server_name</code> = <code>www.abcd.com</code>，Location =
-                <code>/</code>，Directives =
-                <code>proxy_pass http://127.0.0.1:8080;</code>
-              </p>
-              <p>
-                <strong>DNR 改写</strong>：无 <code>server_name</code> 的
-                <code>proxy_pass</code>、<code>rewrite</code>、<code>return</code>
-                仍走 declarativeNetRequest。
-              </p>
-              <p>改完后点击 <strong>Save and Sync</strong>。</p>
-            </div>
-          </details>
+      <details class="help-panel">
+        <summary>卸载与移除信任证书（macOS）</summary>
+        <div class="help-body">
+          <p>按顺序可卸干净扩展、Native Host、本地 CA 与钥匙串信任。</p>
+          <ol>
+            <li>弹窗关掉 <strong>Enable Active Rules</strong>（清空 PAC、断开 host）。</li>
+            <li>
+              <code>chrome://extensions</code> → 移除 <strong>WebNginx</strong>。
+            </li>
+            <li>
+              删除 Native Messaging 注册文件
+              <code>com.webnginx.proxy.json</code>（目录：
+              <code>~/Library/Application Support/Google/Chrome/NativeMessagingHosts/</code>）。
+            </li>
+            <li>
+              删除运行时 CA：终端执行 <code>rm -rf ~/.webnginx</code>（含
+              <code>ca.crt</code> / <code>ca.key</code>）。
+            </li>
+            <li>
+              从<strong>登录钥匙串</strong>移除 <strong>WebNginx Local CA</strong>（只删
+              <code>~/.webnginx</code> <strong>不会</strong>撤销信任）：
+              <ul>
+                <li>
+                  图形界面：打开「钥匙串访问」→ 登录 → 证书 → 找到 WebNginx Local CA →
+                  删除 → 输入本机密码。
+                </li>
+                <li>
+                  命令行（证书文件还在时）：
+                  <code>security remove-trusted-cert -d ~/.webnginx/ca.crt</code>
+                </li>
+                <li>
+                  或按名称删除：
+                  <code>security delete-certificate -c "WebNginx Local CA" ~/Library/Keychains/login.keychain-db</code>
+                </li>
+              </ul>
+            </li>
+            <li>（可选）删除本仓库 / <code>webnginx-native/</code> 源码目录。</li>
+            <li><strong>Cmd+Q</strong> 完全退出 Chrome 再打开。</li>
+          </ol>
+          <p>
+            完整说明见
+            <a
+              href="https://github.com/staochina/WebNginx#卸载干净macos"
+              target="_blank"
+              rel="noopener noreferrer"
+              >README</a
+            >。
+          </p>
         </div>
       </details>
 
       <section class="proxy-status-panel" aria-label="Transparent proxy status">
-        <div class="proxy-status-heading">
-          <h4>透明代理状态 · Proxy status</h4>
-          <span
-            id="proxy-status-badge"
-            class="proxy-status-badge is-unknown"
-            role="status"
-            aria-live="polite"
-            >…</span
-          >
+        <div class="proxy-status-main">
+          <div class="proxy-status-heading">
+            <h4>透明代理状态 · Proxy status</h4>
+            <span
+              id="proxy-status-badge"
+              class="proxy-status-badge is-unknown"
+              role="status"
+              aria-live="polite"
+              >…</span
+            >
+          </div>
+          <label class="proxy-port-row" for="proxy-port">
+            Listen port
+            <input
+              id="proxy-port"
+              type="number"
+              min="1"
+              max="65535"
+              step="1"
+              value="17890"
+              title="默认 17890；修改后需 Save and Sync 生效"
+            />
+          </label>
+          <button id="btn-proxy-retry" type="button" class="btn btn-export btn-sm">
+            Retry connect
+          </button>
         </div>
-        <p id="proxy-status" class="proxy-status">Checking…</p>
-        <pre id="proxy-install-hint" class="proxy-install-hint"></pre>
-        <button id="btn-proxy-retry" type="button" class="btn btn-export">
-          Retry connect
-        </button>
+        <p id="proxy-status" class="proxy-status">正在检查…</p>
+        <details class="proxy-install-panel">
+          <summary>安装说明 · 从零安装</summary>
+          <div class="proxy-install-body">
+            <p class="proxy-port-hint">
+              默认端口 17890；修改 Listen port 后需 <strong>Save and Sync</strong> 生效。改端口不必重生
+              CA。
+            </p>
+            <pre id="proxy-install-hint" class="proxy-install-hint"></pre>
+          </div>
+        </details>
       </section>
 
       <div class="toolbar">
@@ -220,15 +252,15 @@
         />
         <div class="debug-panel">
           <div class="debug-switch">
-            <span class="debug-switch-label" id="debug-log-label">Debug Log</span>
+            <span class="debug-switch-label" id="debug-label">Debug</span>
             <button
-              id="btn-debug-log"
+              id="btn-debug"
               type="button"
               class="switch"
               role="switch"
               aria-checked="false"
-              aria-labelledby="debug-log-label"
-              title="Toggle debug logging"
+              aria-labelledby="debug-label"
+              title="Toggle debug console logs"
             >
               <span class="switch-track" aria-hidden="true">
                 <span class="switch-side">OFF</span>
