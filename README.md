@@ -46,7 +46,7 @@ server {
 
 ## 从零安装（macOS，新手顺序）
 
-纯 DNR（`rewrite` / `return` / 改 Header）**只需第 1 步加载扩展**。只有要用透明 `proxy_pass`（MITM）时，才需要后面的 Native Host 与 CA。
+纯 DNR（`rewrite` / `return` / 改 Header）**只需第 1 步加载扩展**（可以从谷歌应用商店安装 WebNginx，或本地加载）。只有要用透明 `proxy_pass`（MITM）时，才需要后面的 Native Host 与 CA。
 
 ### 准备
 
@@ -58,7 +58,7 @@ server {
 
 | 步 | 你做什么 | 命令 / 打开哪里 | 这一步会生成什么 |
 | --- | --- | --- | --- |
-| **1** | 加载扩展 | Chrome 打开 `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选仓库里的 **`src/`**（或先 `make buildc`，再加载解压后的 zip；zip 根目录须含 `manifest.json`） | 扩展出现在列表里，并有一串 **ID** |
+| **1** | 加载扩展 | **可以从谷歌应用商店安装 WebNginx**；或 Chrome 打开 `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选仓库里的 **`src/`**（或先 `make buildc`，再加载解压后的 zip；zip 根目录须含 `manifest.json`） | 扩展出现在列表里，并有一串 **ID** |
 | **2** | 记下扩展 ID | 仍在 `chrome://extensions`，复制该扩展的 ID | （无文件） |
 | **3** | 安装 Native Host | 在 webnginx-native 安装目录执行下行命令（把 ID 换成你的） | Chrome Native Messaging 配置；缺依赖时会 `npm install`。**不**生成 CA、**不**写入钥匙串 |
 | **4** | 刷新扩展 | 回到 `chrome://extensions`，点 WebNginx 的 **重新加载** | 扩展重新读到刚装的 host 绑定 |

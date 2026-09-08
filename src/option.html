@@ -88,11 +88,12 @@
         <summary>本地 Host 与 CA（从零安装）</summary>
         <div class="help-body">
           <p>
-            仅 MITM（透明 <code>proxy_pass</code>）需要 Host / CA；纯 DNR 只需加载扩展。下面按顺序做，命令在webnginx-native安装目录执行。
+            仅 MITM（透明 <code>proxy_pass</code>）需要 Host / CA；纯 DNR 只需加载扩展（可以从谷歌应用商店安装 WebNginx，或本地加载）。下面按顺序做，命令在webnginx-native安装目录执行。
           </p>
           <ol>
             <li>
-              Chrome 打开 <code>chrome://extensions</code> → 开发者模式 →「加载已解压的扩展程序」→ 选
+              可以从谷歌应用商店安装 WebNginx；或 Chrome 打开
+              <code>chrome://extensions</code> → 开发者模式 →「加载已解压的扩展程序」→ 选
               <code>src/</code>（或 <code>make buildc</code> 后解压 zip）。
             </li>
             <li>复制该扩展的 <strong>ID</strong>。</li>
