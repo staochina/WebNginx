@@ -175,7 +175,7 @@ function ensureNativeConnected() {
       reject(
         new Error(
           `Native host not found (${NATIVE_HOST_NAME}). ` +
-            `In repo run: make install-host EXT_ID=${chrome.runtime.id} ` +
+            `In webnginx-native/ run: make install-host EXT_ID=${chrome.runtime.id} ` +
             `then fully quit Chrome (Cmd+Q) and reopen. Original: ${error.message}`,
         ),
       );

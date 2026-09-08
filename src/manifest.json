@@ -1,7 +1,7 @@
 {
   "name": "WebNginx",
   "description": "面向浏览器请求的 Nginx 风格透明反向代理、URL 改写与 Header 规则",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "manifest_version": 3,
   "icons": {
     "16": "img/16.png",

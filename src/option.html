@@ -88,17 +88,19 @@
         <summary>本地 Host 与 CA（从零安装）</summary>
         <div class="help-body">
           <p>
-            仅 MITM（透明 <code>proxy_pass</code>）需要 Host / CA；纯 DNR 只需加载扩展（可以从谷歌应用商店安装 WebNginx，或本地加载）。下面按顺序做，命令在webnginx-native安装目录执行。
+            仅 MITM（透明 <code>proxy_pass</code>）需要 Host / CA；纯 DNR 只需加载扩展（可以从谷歌应用商店安装 WebNginx，或本地加载）。下面按顺序做；Host / CA 命令在
+            <code>webnginx-native/</code>（可复制到任意路径）执行。
           </p>
           <ol>
             <li>
               可以从谷歌应用商店安装 WebNginx；或 Chrome 打开
               <code>chrome://extensions</code> → 开发者模式 →「加载已解压的扩展程序」→ 选
-              <code>src/</code>（或 <code>make buildc</code> 后解压 zip）。
+              <code>src/</code>（或仓库根目录 <code>make buildc</code> 后解压 zip）。
             </li>
             <li>复制该扩展的 <strong>ID</strong>。</li>
             <li>
-              终端：<code>make install-host EXT_ID=你的ID</code>（只装 Native Messaging，
+              在 <code>webnginx-native/</code> 终端：
+              <code>make install-host EXT_ID=你的ID</code>（只装 Native Messaging，
               <strong>不</strong>生成 CA、不写钥匙串）。
             </li>
             <li>回到 <code>chrome://extensions</code>，点 WebNginx <strong>重新加载</strong>。</li>
@@ -112,7 +114,7 @@
               <code>~/.webnginx/ca.crt</code> / <code>ca.key</code>。
             </li>
             <li>
-              终端：<code>make trust-ca</code>（把 CA 写入登录钥匙串；需本机密码）。
+              在 <code>webnginx-native/</code> 终端：<code>make trust-ca</code>（把 CA 写入登录钥匙串；需本机密码）。
             </li>
             <li>
               <strong>Cmd+Q</strong> 完全退出 Chrome 再打开（只关窗口不够）。

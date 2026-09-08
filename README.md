@@ -52,7 +52,7 @@ server {
 
 - 本机已装 **Node.js**（终端能跑 `node -v`、`npm -v`）
 - 已拿到本仓库（含 `src/` 与 `webnginx-native/`）
-- 在 **webnginx-native 安装目录**（`webnginx-native/`）打开终端（下面命令都在这里执行；也可用仓库根目录的 `make install-host` / `make trust-ca`）
+- 在 **webnginx-native 安装目录**（可复制到任意路径，如 `~/webnginx-native`）打开终端执行 `make install-host` / `make trust-ca`（仓库根目录 Makefile 只负责打包 `src/`）
 
 ### 顺序（按步做，不要跳）
 
@@ -60,21 +60,21 @@ server {
 | --- | --- | --- | --- |
 | **1** | 加载扩展 | **可以从谷歌应用商店安装 WebNginx**；或 Chrome 打开 `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选仓库里的 **`src/`**（或先 `make buildc`，再加载解压后的 zip；zip 根目录须含 `manifest.json`） | 扩展出现在列表里，并有一串 **ID** |
 | **2** | 记下扩展 ID | 仍在 `chrome://extensions`，复制该扩展的 ID | （无文件） |
-| **3** | 安装 Native Host | 在 webnginx-native 安装目录执行下行命令（把 ID 换成你的） | Chrome Native Messaging 配置；缺依赖时会 `npm install`。**不**生成 CA、**不**写入钥匙串 |
+| **3** | 安装 Native Host | 在 webnginx-native 目录执行下行命令（把 ID 换成你的） | Chrome Native Messaging 配置；缺依赖时会 `npm install`。**不**生成 CA、**不**写入钥匙串 |
 | **4** | 刷新扩展 | 回到 `chrome://extensions`，点 WebNginx 的 **重新加载** | 扩展重新读到刚装的 host 绑定 |
 | **5** | 打开设置并写一条 MITM 规则 | 扩展 → **Options**；或弹窗进设置。加一个 `server`：填 `server_name`，Location 勾 Active，Directives 写纯 `proxy_pass …;`（不要同条再写 `rewrite`/`return`） | （仅编辑区，尚未生效） |
 | **6** | 打开总开关并保存 | 工具栏弹窗打开 **Enable Active Rules**；设置页点 **Save and Sync** | 启动 host、监听端口；**首次**会在 `~/.webnginx/` 生成 `ca.crt` / `ca.key`（叶证书只在内存，不进系统） |
-| **7** | 信任本地 CA（HTTPS 必做） | 确认 `~/.webnginx/ca.crt` 已存在后，在 webnginx-native 安装目录执行下行命令；按提示输入本机密码 | 把 CA 写入**登录钥匙串**为信任根（`install-host` 不会做这一步） |
+| **7** | 信任本地 CA（HTTPS 必做） | 确认 `~/.webnginx/ca.crt` 已存在后，在 webnginx-native 目录执行下行命令；按提示输入本机密码 | 把 CA 写入**登录钥匙串**为信任根（`install-host` 不会做这一步） |
 | **8** | 完全退出再开 Chrome | **Cmd+Q** 退出 Chrome（不要只关窗口），再重新打开 | 让 Chrome 重新读取钥匙串信任 |
 | **9** | 确认成功 | Options → **透明代理状态 · Proxy status**：徽章 **ON**；访问你配置的 `server_name` 域名做验证 | — |
 
-**第 3 步命令：**
+**第 3 步命令（在 `webnginx-native/` 目录）：**
 
 ```bash
 make install-host EXT_ID=你的扩展ID
 ```
 
-**第 7 步命令：**
+**第 7 步命令（同上目录）：**
 
 ```bash
 make trust-ca
@@ -166,7 +166,7 @@ security delete-certificate -c "WebNginx Local CA" "$HOME/Library/Keychains/logi
 
 - Host 名：`com.webnginx.proxy`
 - Manifest：`~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.webnginx.proxy.json`
-- 换扩展 ID / 换机 / 重装后需重新 `make install-host EXT_ID=...`
+- 换扩展 ID / 换机 / 重装后需在 `webnginx-native/` 重新 `make install-host EXT_ID=...`
 
 ### `~/.webnginx/`（运行时 CA）
 
@@ -198,12 +198,15 @@ security delete-certificate -c "WebNginx Local CA" "$HOME/Library/Keychains/logi
 
 ## 开发
 
+仓库根目录 Makefile 仅打包 / 测试扩展前端：
+
 ```bash
 make test
 make build
 ```
 
 - `make buildc` → `target/webnginx-chrome.zip`（`src/` 下文件，无多余 `src/` 前缀）
+- Native Host：`cd webnginx-native && make install-host EXT_ID=…` / `make trust-ca`
 - 扩展侧共享文本解析：[`src/nginxText.js`](src/nginxText.js)；规则引擎 [`src/nginxParser.js`](src/nginxParser.js)；设置页模型 [`src/configModel.js`](src/configModel.js)
 
 ## 需求文档

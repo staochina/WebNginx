@@ -104,8 +104,9 @@ export class MitmProxy {
 
     const route = matchRoute(this.routes, host, pathname.split('?')[0]);
     if (!route) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('WebNginx: no matching proxy route');
+      // Chrome PAC only sees host for HTTPS, so unmatched paths still hit us —
+      // passthrough to the original origin instead of 404.
+      await this.forward(this.originPassthroughRoute('http:', host), req, res, pathname);
       return;
     }
 
@@ -136,12 +137,13 @@ export class MitmProxy {
       const route =
         matchRoute(this.routes, hostHeader, path.split('?')[0]) ||
         matchRoute(this.routes, hostname, path.split('?')[0]);
-      if (!route) {
-        res2.writeHead(404, { 'Content-Type': 'text/plain' });
-        res2.end('WebNginx: no matching proxy route');
-        return;
-      }
-      this.forward(route, req2, res2, path).catch((err) => {
+      const target =
+        route ||
+        this.originPassthroughRoute(
+          'https:',
+          port === 443 ? hostname : `${hostname}:${port}`,
+        );
+      this.forward(target, req2, res2, path).catch((err) => {
         if (!res2.headersSent) {
           res2.writeHead(502, { 'Content-Type': 'text/plain' });
         }
@@ -154,6 +156,22 @@ export class MitmProxy {
     });
 
     fakeServer.emit('connection', tlsSocket);
+  }
+
+  /**
+   * Synthetic route: keep request path, fetch from the browser's original host.
+   * @param {'http:'|'https:'} protocol
+   * @param {string} hostHeader host or host:port
+   */
+  originPassthroughRoute(protocol, hostHeader) {
+    const host = String(hostHeader || '').trim() || 'localhost';
+    return {
+      matchType: 'prefix',
+      pattern: '/',
+      upstream: `${protocol}//${host}/`,
+      proxySetHeaders: [],
+      addHeaders: [],
+    };
   }
 
   async forward(route, req, res, reqPath) {

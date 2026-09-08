@@ -575,12 +575,12 @@ async function refreshProxyStatus() {
     `从零安装（macOS），按顺序：\n` +
     `1. chrome://extensions → 加载已解压的扩展程序 → 选 src/\n` +
     `2. 复制扩展 ID\n` +
-    `3. make install-host EXT_ID=${extId}\n` +
+    `3. cd webnginx-native && make install-host EXT_ID=${extId}\n` +
     `   （只注册 Native Messaging，不会生成 CA）\n` +
     `4. 在 chrome://extensions 重新加载本扩展\n` +
     `5. 本页：勾选 Active 的 proxy_pass + 弹窗总开关开启 + Save and Sync\n` +
     `   （首次 Save 会生成 ~/.webnginx/ca.crt）\n` +
-    `6. make trust-ca\n` +
+    `6. cd webnginx-native && make trust-ca\n` +
     `7. Cmd+Q 完全退出 Chrome 后再打开\n` +
     `Host 名：com.webnginx.proxy`;
 
