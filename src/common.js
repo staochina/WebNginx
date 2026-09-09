@@ -42,6 +42,31 @@ export async function setGlobalSwitch(value) {
   await chrome.storage.sync.set({ globalSwitch: value });
 }
 
+/** @returns {'windows'|'macos'|'other'} */
+export function detectHostOs() {
+  const uaPlatform = navigator.userAgentData?.platform;
+  const platform = String(uaPlatform || navigator.platform || '').toLowerCase();
+  const ua = String(navigator.userAgent || '').toLowerCase();
+  if (platform.includes('win') || ua.includes('windows')) {
+    return 'windows';
+  }
+  if (platform.includes('mac') || ua.includes('mac os') || ua.includes('macintosh')) {
+    return 'macos';
+  }
+  return 'other';
+}
+
+/** How to fully quit Chrome so native host / CA trust refresh. */
+export function chromeQuitHint(os = detectHostOs()) {
+  if (os === 'windows') {
+    return '完全退出 Chrome（任务栏托盘图标也要退出）后再打开';
+  }
+  if (os === 'macos') {
+    return 'Cmd+Q 完全退出 Chrome 后再打开';
+  }
+  return '完全退出 Chrome 后再打开';
+}
+
 export const DEFAULT_PROXY_PORT = 17890;
 
 export function parseProxyPort(value) {

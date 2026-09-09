@@ -19,8 +19,8 @@
     <main>
       <h4>Server Rules</h4>
       <p>
-        规则按 <code>server</code> 分组；<code>server_name</code> 必填；每行一个
-        <code>location</code>。须 <strong>Save and Sync</strong> 后生效。完整说明见
+        规则按 <code>server</code> 分组；<code>server_name</code> 必填。须
+        <strong>Save and Sync</strong> 后生效。点击下方标签查看摘要；完整说明见
         <a
           href="https://github.com/staochina/WebNginx"
           target="_blank"
@@ -29,169 +29,246 @@
         >。
       </p>
 
-      <details class="help-panel">
-        <summary>工作原理</summary>
-        <div class="help-body">
-          <ul>
-            <li>
-              <strong>MITM 透明代理</strong>：纯 <code>proxy_pass</code>（无
-              <code>rewrite</code>/<code>return</code>）→ PAC + 本地 Native Host；地址栏域名不变。
-            </li>
-            <li>
-              <strong>DNR</strong>：<code>rewrite</code> / <code>return</code> / 纯改
-              Header，或同 Location 把 <code>proxy_pass</code> 与
-              <code>rewrite</code>/<code>return</code> 写在一起 → 退回浏览器侧规则。
-            </li>
-            <li>
-              每个 <code>server</code> 必须有非空 <code>server_name</code>；弹窗总开关关闭会清空
-              DNR 与 PAC。
-            </li>
-          </ul>
+      <section class="help-tabs" id="help-tabs" aria-label="使用说明">
+        <div class="help-tablist" role="tablist" aria-label="说明分类">
+          <button
+            type="button"
+            class="help-tab"
+            role="tab"
+            id="help-tab-how"
+            aria-controls="help-panel-how"
+            aria-selected="false"
+            data-help-tab="how"
+          >
+            工作原理
+          </button>
+          <button
+            type="button"
+            class="help-tab"
+            role="tab"
+            id="help-tab-usage"
+            aria-controls="help-panel-usage"
+            aria-selected="false"
+            data-help-tab="usage"
+          >
+            操作与填写说明
+          </button>
+          <button
+            type="button"
+            class="help-tab"
+            role="tab"
+            id="help-tab-host"
+            aria-controls="help-panel-host"
+            aria-selected="false"
+            data-help-tab="host"
+          >
+            本地 Host 与 CA
+          </button>
+          <button
+            type="button"
+            class="help-tab"
+            role="tab"
+            id="help-tab-uninstall"
+            aria-controls="help-panel-uninstall"
+            aria-selected="false"
+            data-help-tab="uninstall"
+          >
+            卸载与移除证书
+          </button>
         </div>
-      </details>
 
-      <details class="help-panel">
-        <summary>操作与填写说明</summary>
-        <div class="help-body">
-          <ul>
-            <li>
-              编辑 / Import 只改本页；必须 <strong>Save and Sync</strong>。未保存关闭会丢失。
-            </li>
-            <li>
-              <code>server_name</code> 必填（可空格写多个域名）。Location：前缀
-              <code>/</code>、<code>/api</code>，或正则 <code>~</code> /
-              <code>~*</code>。
-            </li>
-            <li>
-              指令：<code>proxy_pass</code>、<code>rewrite</code>、
-              <code>proxy_set_header</code>、<code>add_header</code>、
-              <code>return 403|444</code>（每行以 <code>;</code> 结尾）。
-            </li>
-            <li>
-              同 server 内<strong>更靠下</strong>的 Location 优先（可拖动 ⋮⋮）。Inactive 不参与。
-            </li>
-            <li>
-              Export / Import 使用 nginx 风格 <code>.conf</code>；Import 整体替换编辑区。
-            </li>
-            <li>
-              <strong>Debug</strong> 立即开关，只打控制台 <code>[WebNginx]</code> 日志，不落盘。
-            </li>
-            <li>
-              示例：<code>server_name www.abcd.com</code> +
-              <code>proxy_pass http://127.0.0.1:8080;</code> → MITM（需 Host / CA，见下一栏）。
-            </li>
-          </ul>
-        </div>
-      </details>
-
-      <details class="help-panel">
-        <summary>本地 Host 与 CA（从零安装）</summary>
-        <div class="help-body">
-          <p>
-            仅 MITM（透明 <code>proxy_pass</code>）需要 Host / CA；纯 DNR 只需加载扩展（可以从谷歌应用商店安装 WebNginx，或本地加载）。下面按顺序做；Host / CA 命令在
-            <code>webnginx-native/</code>（可复制到任意路径）执行。
-          </p>
-          <ol>
-            <li>
-              可以从谷歌应用商店安装 WebNginx；或 Chrome 打开
-              <code>chrome://extensions</code> → 开发者模式 →「加载已解压的扩展程序」→ 选
-              <code>src/</code>（或仓库根目录 <code>make buildc</code> 后解压 zip）。
-            </li>
-            <li>复制该扩展的 <strong>ID</strong>。</li>
-            <li>
-              在 <code>webnginx-native/</code> 终端：
-              <code>make install-host EXT_ID=你的ID</code>（只装 Native Messaging，
-              <strong>不</strong>生成 CA、不写钥匙串）。
-            </li>
-            <li>回到 <code>chrome://extensions</code>，点 WebNginx <strong>重新加载</strong>。</li>
-            <li>
-              打开本页（Options）：添加 server，填 <code>server_name</code>，Active 勾选，写纯
-              <code>proxy_pass …;</code>（同条不要再写 <code>rewrite</code>/<code>return</code>）。
-            </li>
-            <li>
-              弹窗打开总开关 <strong>Enable Active Rules</strong>，再点
-              <strong>Save and Sync</strong> → host 启动并<strong>首次</strong>生成
-              <code>~/.webnginx/ca.crt</code> / <code>ca.key</code>。
-            </li>
-            <li>
-              在 <code>webnginx-native/</code> 终端：<code>make trust-ca</code>（把 CA 写入登录钥匙串；需本机密码）。
-            </li>
-            <li>
-              <strong>Cmd+Q</strong> 完全退出 Chrome 再打开（只关窗口不够）。
-            </li>
-            <li>
-              本页下方徽章应为 <strong>ON</strong>；再访问配置的域名验证。
-            </li>
-          </ol>
-          <ul>
-            <li>
-              扩展 ID 变更后须重跑 <code>install-host</code> 并重新加载扩展；删过
-              <code>~/.webnginx/</code> 或换机后须再 Save 生成 CA，再
-              <code>trust-ca</code> + Cmd+Q。改端口不必重生证书。
-            </li>
-            <li>
-              叶证书只在 host 内存；完整说明与排错见
-              <a
-                href="https://github.com/staochina/WebNginx#从零安装macos新手顺序"
-                target="_blank"
-                rel="noopener noreferrer"
-                >README</a
-              >。
-            </li>
-          </ul>
-        </div>
-      </details>
-
-      <details class="help-panel">
-        <summary>卸载与移除信任证书（macOS）</summary>
-        <div class="help-body">
-          <p>按顺序可卸干净扩展、Native Host、本地 CA 与钥匙串信任。</p>
-          <ol>
-            <li>弹窗关掉 <strong>Enable Active Rules</strong>（清空 PAC、断开 host）。</li>
-            <li>
-              <code>chrome://extensions</code> → 移除 <strong>WebNginx</strong>。
-            </li>
-            <li>
-              删除 Native Messaging 注册文件
-              <code>com.webnginx.proxy.json</code>（目录：
-              <code>~/Library/Application Support/Google/Chrome/NativeMessagingHosts/</code>）。
-            </li>
-            <li>
-              删除运行时 CA：终端执行 <code>rm -rf ~/.webnginx</code>（含
-              <code>ca.crt</code> / <code>ca.key</code>）。
-            </li>
-            <li>
-              从<strong>登录钥匙串</strong>移除 <strong>WebNginx Local CA</strong>（只删
-              <code>~/.webnginx</code> <strong>不会</strong>撤销信任）：
+        <div class="help-panels">
+          <div
+            class="help-panel"
+            role="tabpanel"
+            id="help-panel-how"
+            aria-labelledby="help-tab-how"
+            hidden
+          >
+            <div class="help-body">
               <ul>
                 <li>
-                  图形界面：打开「钥匙串访问」→ 登录 → 证书 → 找到 WebNginx Local CA →
-                  删除 → 输入本机密码。
+                  <strong>MITM</strong>：纯 <code>proxy_pass</code>（同 Location 无
+                  <code>rewrite</code> / <code>return</code>）→ PAC + Native Host，地址栏域名不变。
                 </li>
                 <li>
-                  命令行（证书文件还在时）：
-                  <code>security remove-trusted-cert -d ~/.webnginx/ca.crt</code>
+                  <strong>DNR</strong>：<code>rewrite</code> / <code>return</code> / 纯改 Header，或同
+                  Location 把 <code>proxy_pass</code> 与 <code>rewrite</code>/<code>return</code>
+                  写在一起 → 浏览器侧改写 / 拦截 / 改头。
                 </li>
                 <li>
-                  或按名称删除：
-                  <code>security delete-certificate -c "WebNginx Local CA" ~/Library/Keychains/login.keychain-db</code>
+                  <code>server_name</code> 必填；弹窗总开关关闭会清空 DNR 与 PAC。
                 </li>
               </ul>
-            </li>
-            <li>（可选）删除本仓库 / <code>webnginx-native/</code> 源码目录。</li>
-            <li><strong>Cmd+Q</strong> 完全退出 Chrome 再打开。</li>
-          </ol>
-          <p>
-            完整说明见
-            <a
-              href="https://github.com/staochina/WebNginx#卸载干净macos"
-              target="_blank"
-              rel="noopener noreferrer"
-              >README</a
-            >。
-          </p>
+            </div>
+          </div>
+
+          <div
+            class="help-panel"
+            role="tabpanel"
+            id="help-panel-usage"
+            aria-labelledby="help-tab-usage"
+            hidden
+          >
+            <div class="help-body">
+              <ul>
+                <li>
+                  编辑 / Import 只改本页；须 <strong>Save and Sync</strong> 才生效，未保存关闭会丢失。
+                </li>
+                <li>
+                  <code>server_name</code> 必填（多个域名用空格分隔）。Location：前缀
+                  <code>/</code>、<code>/api</code>，或正则 <code>~</code> / <code>~*</code>。
+                </li>
+                <li>
+                  指令（每行以 <code>;</code> 结尾）：<code>proxy_pass</code>、
+                  <code>rewrite</code>、<code>proxy_set_header</code>、<code>add_header</code>、
+                  <code>return 403|444</code>。
+                </li>
+                <li>
+                  同 server 内<strong>更靠下</strong>的 Location 优先（可拖 ⋮⋮）；Inactive 不参与匹配。
+                </li>
+                <li>
+                  Export / Import 为 nginx 风格 <code>.conf</code>；Import 整体替换编辑区（不合并）。
+                </li>
+                <li>
+                  <strong>Debug</strong>：立即开关，仅控制台 <code>[WebNginx]</code> 日志，不落盘。
+                </li>
+                <li>
+                  MITM 示例：<code>server_name www.abcd.com</code> +
+                  <code>proxy_pass http://127.0.0.1:8080;</code>（需 Host / CA，见相邻标签）。
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div
+            class="help-panel"
+            role="tabpanel"
+            id="help-panel-host"
+            aria-labelledby="help-tab-host"
+            hidden
+          >
+            <div class="help-body">
+              <p>
+                仅透明 <code>proxy_pass</code>（MITM）需要；纯 DNR 可跳过。命令在
+                <code>webnginx-native/</code> 执行。下方按<strong>当前系统</strong>显示步骤；完整说明见
+                <a
+                  href="https://github.com/staochina/WebNginx#从零安装"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >README</a
+                >。
+              </p>
+              <ol>
+                <li>
+                  加载扩展：应用商店安装，或 <code>chrome://extensions</code> → 开发者模式 →
+                  加载已解压程序 → 选 <code>src/</code>。
+                </li>
+                <li>复制扩展 <strong>ID</strong>。</li>
+                <li>
+                  安装 Native Host（只注册通信，<strong>不</strong>生成 CA）：
+                  <div class="platform-note" data-platform="macos">
+                    <code>make install-host EXT_ID=你的ID</code>
+                  </div>
+                  <div class="platform-note" data-platform="windows">
+                    使用 <strong>Git Bash</strong>（勿用纯 WSL）：
+                    <code>make install-host EXT_ID=你的ID</code>
+                    （可选 <code>SHELL_KIND=sh</code>）
+                  </div>
+                </li>
+                <li>
+                  <code>chrome://extensions</code> → 重新加载 WebNginx。
+                </li>
+                <li>
+                  本页添加规则：填 <code>server_name</code>，Active 勾选，写纯
+                  <code>proxy_pass …;</code>（同条不要写 <code>rewrite</code>/<code>return</code>）。
+                </li>
+                <li>
+                  弹窗打开 <strong>Enable Active Rules</strong> → <strong>Save and Sync</strong>。
+                  首次会生成 <code>~/.webnginx/ca.crt</code>（有效期 10 年；Windows：
+                  <code>%USERPROFILE%\.webnginx\</code>）。
+                </li>
+                <li>
+                  信任 CA（HTTPS 必做）：
+                  <div class="platform-note" data-platform="macos">
+                    <code>make trust-ca</code> → 写入登录钥匙串（需本机密码）
+                  </div>
+                  <div class="platform-note" data-platform="windows">
+                    <code>make trust-ca</code> → 写入当前用户受信任根证书
+                  </div>
+                </li>
+                <li>
+                  完全退出再开 Chrome：
+                  <span data-platform="macos"
+                    ><strong>Cmd+Q</strong>（只关窗口不够；Chrome 会缓存系统证书信任）</span
+                  >
+                  <span data-platform="windows"
+                    >退出任务栏/托盘图标后再打开（Chrome 会缓存系统证书信任）</span
+                  >
+                </li>
+                <li>本页 Proxy status 徽章为 <strong>ON</strong>，再访问配置域名验证。</li>
+              </ol>
+              <ul>
+                <li>扩展 ID 变了 → 重跑 <code>install-host</code> 并重新加载扩展。</li>
+                <li>删过 CA / 换机 → 再 Save 生成证书，然后 <code>trust-ca</code> 并完全退出 Chrome（Chrome 会缓存系统证书信任）。</li>
+                <li>只改 Listen port → Save and Sync 即可，不必重生或重信任 CA。</li>
+              </ul>
+            </div>
+          </div>
+
+          <div
+            class="help-panel"
+            role="tabpanel"
+            id="help-panel-uninstall"
+            aria-labelledby="help-tab-uninstall"
+            hidden
+          >
+            <div class="help-body">
+              <p>
+                按顺序卸干净扩展、Host、本地 CA 与系统信任。下方按<strong>当前系统</strong>显示；详见
+                <a
+                  href="https://github.com/staochina/WebNginx#卸载干净"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >README</a
+                >。
+              </p>
+              <ol>
+                <li>弹窗关掉 <strong>Enable Active Rules</strong>。</li>
+                <li><code>chrome://extensions</code> → 移除 WebNginx。</li>
+                <li>
+                  删除 Native Messaging 注册：
+                  <div class="platform-note" data-platform="macos">
+                    删除
+                    <code>~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.webnginx.proxy.json</code>
+                  </div>
+                  <div class="platform-note" data-platform="windows">
+                    <code>reg delete "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.webnginx.proxy" /f</code>
+                  </div>
+                </li>
+                <li>删除运行时 CA：<code>rm -rf ~/.webnginx</code>。</li>
+                <li>
+                  从系统信任中移除 <strong>WebNginx Local CA</strong>（只删文件<strong>不会</strong>撤销信任）：
+                  <div class="platform-note" data-platform="macos">
+                    「钥匙串访问」→ 登录 → 证书 → 删除；或
+                    <code>security remove-trusted-cert -d ~/.webnginx/ca.crt</code>
+                  </div>
+                  <div class="platform-note" data-platform="windows">
+                    <code>certmgr.msc</code> → 受信任的根证书颁发机构 → 删除；或
+                    <code>certutil -user -delstore Root "WebNginx Local CA"</code>
+                  </div>
+                </li>
+                <li>（可选）删除 <code>webnginx-native/</code> 源码目录。</li>
+                <li>
+                  完全退出再开 Chrome：
+                  <span data-platform="macos"><strong>Cmd+Q</strong></span>
+                  <span data-platform="windows">含托盘退出</span>
+                </li>
+              </ol>
+            </div>
+          </div>
         </div>
-      </details>
+      </section>
 
       <section class="proxy-status-panel" aria-label="Transparent proxy status">
         <div class="proxy-status-main">

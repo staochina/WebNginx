@@ -11,6 +11,8 @@ import {
   setProxyPort,
   parseProxyPort,
   DEFAULT_PROXY_PORT,
+  detectHostOs,
+  chromeQuitHint,
 } from './common.js';
 import { parseConfigModel, serializeConfigModel } from './configModel.js';
 import {
@@ -27,6 +29,8 @@ async function onload() {
   const manifest = chrome.runtime.getManifest();
   document.getElementById('version').textContent = manifest.version;
   document.getElementById('description').textContent = manifest.description;
+  applyPlatformHelp(detectHostOs());
+  initHelpTabs();
 
   let raw = await getDynamicRules();
   if (!raw.trim()) {
@@ -83,21 +87,42 @@ async function onload() {
     );
   });
 
-  document.querySelectorAll('.help-toc a').forEach((link) => {
-    link.addEventListener('click', (e) => {
-      const id = link.getAttribute('href')?.slice(1);
-      const section = id && document.getElementById(id);
-      if (!section || section.tagName !== 'DETAILS') {
-        return;
-      }
-      e.preventDefault();
-      section.open = true;
-      section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  render();
+  await refreshPreview();
+}
+
+/** Horizontal help tabs: click to expand, click again to collapse. Default collapsed. */
+function initHelpTabs() {
+  const root = document.getElementById('help-tabs');
+  if (!root) {
+    return;
+  }
+  const tabs = [...root.querySelectorAll('.help-tab')];
+  const panels = [...root.querySelectorAll('.help-panel')];
+
+  function setOpen(tabId) {
+    const open = Boolean(tabId);
+    tabs.forEach((tab) => {
+      const selected = open && tab.dataset.helpTab === tabId;
+      tab.classList.toggle('is-active', selected);
+      tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+    panels.forEach((panel) => {
+      const show = open && panel.id === `help-panel-${tabId}`;
+      panel.hidden = !show;
+    });
+    root.classList.toggle('is-open', open);
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const id = tab.dataset.helpTab;
+      const selected = tab.getAttribute('aria-selected') === 'true';
+      setOpen(selected ? null : id);
     });
   });
 
-  render();
-  await refreshPreview();
+  setOpen(null);
 }
 
 function newLocation() {
@@ -571,18 +596,7 @@ async function refreshProxyStatus() {
   }
 
   const extId = chrome.runtime.id;
-  const installGuide =
-    `从零安装（macOS），按顺序：\n` +
-    `1. chrome://extensions → 加载已解压的扩展程序 → 选 src/\n` +
-    `2. 复制扩展 ID\n` +
-    `3. cd webnginx-native && make install-host EXT_ID=${extId}\n` +
-    `   （只注册 Native Messaging，不会生成 CA）\n` +
-    `4. 在 chrome://extensions 重新加载本扩展\n` +
-    `5. 本页：勾选 Active 的 proxy_pass + 弹窗总开关开启 + Save and Sync\n` +
-    `   （首次 Save 会生成 ~/.webnginx/ca.crt）\n` +
-    `6. cd webnginx-native && make trust-ca\n` +
-    `7. Cmd+Q 完全退出 Chrome 后再打开\n` +
-    `Host 名：com.webnginx.proxy`;
+  const installGuide = buildInstallGuide(extId);
 
   setProxyStatusBadge(badgeEl, 'unknown');
   statusEl.textContent = '正在检查 Native Host…';
@@ -600,11 +614,10 @@ async function refreshProxyStatus() {
     const listening = !!(status.listening || status.running);
     setProxyStatusBadge(badgeEl, listening ? 'on' : 'off');
 
-    // Listening: never show the "Native Host 不可用" install-host error.
+    // Listening: keep install guide short; full steps stay in the help panels above.
     if (listening) {
       hintEl.textContent =
-        `连接正常，代理已在监听。\n` +
-        `如需重装 Host 或信任 CA，可展开下方安装说明。\n\n` +
+        `连接正常。重装 Host / 信任 CA 见上方「本地 Host 与 CA」。\n\n` +
         installGuide;
       statusEl.textContent =
         `正在监听 127.0.0.1:${status.listenPort}` +
@@ -628,13 +641,47 @@ async function refreshProxyStatus() {
     );
     statusEl.textContent =
       `Native Host 不可用：${detail}。` +
-      `请在webnginx-native安装目录执行：make install-host EXT_ID=${extId}，` +
-      `然后在 chrome://extensions 重新加载扩展；若仍失败，Cmd+Q 完全退出 Chrome 后再打开。`;
+      `请在 webnginx-native/ 执行 make install-host EXT_ID=${extId}，` +
+      `重新加载扩展；若仍失败，${chromeQuitHint()}。`;
   } catch (e) {
     setProxyStatusBadge(badgeEl, 'off');
     hintEl.textContent = installGuide;
     statusEl.textContent = `代理状态出错：${localizeNativeError(e.message || e)}`;
   }
+}
+
+/** Show only current-OS platform notes in help panels. */
+function applyPlatformHelp(os) {
+  const effective = os === 'other' ? 'macos' : os;
+  document.querySelectorAll('[data-platform]').forEach((el) => {
+    const platforms = String(el.getAttribute('data-platform') || '')
+      .split(/\s+/)
+      .filter(Boolean);
+    el.classList.toggle('is-current-platform', platforms.includes(effective));
+  });
+}
+
+function buildInstallGuide(extId) {
+  const os = detectHostOs();
+  const quit = chromeQuitHint(os);
+  const caPath =
+    os === 'windows' ? '%USERPROFILE%\\.webnginx\\ca.crt' : '~/.webnginx/ca.crt';
+  const platform =
+    os === 'windows' ? 'Windows / Git Bash' : os === 'macos' ? 'macOS' : '本机';
+  const shellNote =
+    os === 'windows' ? '\n   （可选 SHELL_KIND=sh）' : '';
+
+  return (
+    `从零安装（${platform}）：\n` +
+    `1. 加载扩展并复制 ID（当前：${extId}）\n` +
+    `2. cd webnginx-native && make install-host EXT_ID=${extId}${shellNote}\n` +
+    `3. chrome://extensions → 重新加载\n` +
+    `4. Active proxy_pass + 弹窗总开关 + Save and Sync\n` +
+    `   （首次生成 ${caPath}，有效期 10 年）\n` +
+    `5. make trust-ca\n` +
+    `6. ${quit}（Chrome 会缓存系统证书信任）\n` +
+    `Host：com.webnginx.proxy`
+  );
 }
 
 /** Map common Chrome native-messaging errors to Chinese. */

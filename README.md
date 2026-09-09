@@ -44,7 +44,7 @@ server {
 
 上例走 MITM。若同 Location 再写 `rewrite` / `return`，整条退回 DNR。
 
-## 从零安装（macOS，新手顺序）
+## 从零安装
 
 纯 DNR（`rewrite` / `return` / 改 Header）**只需第 1 步加载扩展**（可以从谷歌应用商店安装 WebNginx，或本地加载）。只有要用透明 `proxy_pass`（MITM）时，才需要后面的 Native Host 与 CA。
 
@@ -52,7 +52,8 @@ server {
 
 - 本机已装 **Node.js**（终端能跑 `node -v`、`npm -v`）
 - 已拿到本仓库（含 `src/` 与 `webnginx-native/`）
-- 在 **webnginx-native 安装目录**（可复制到任意路径，如 `~/webnginx-native`）打开终端执行 `make install-host` / `make trust-ca`（仓库根目录 Makefile 只负责打包 `src/`）
+- 在 **webnginx-native 安装目录**（可复制到任意路径）打开终端执行 `make install-host` / `make trust-ca`（仓库根目录 Makefile 只负责打包 `src/`）
+- **Windows**：请用 **Git Bash** 或 **MSYS**（需能调用 `reg.exe` / `certutil.exe`）。纯 WSL 环境无法正确注册给 Windows Chrome 使用的 Native Host。
 
 ### 顺序（按步做，不要跳）
 
@@ -60,32 +61,45 @@ server {
 | --- | --- | --- | --- |
 | **1** | 加载扩展 | **可以从谷歌应用商店安装 WebNginx**；或 Chrome 打开 `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选仓库里的 **`src/`**（或先 `make buildc`，再加载解压后的 zip；zip 根目录须含 `manifest.json`） | 扩展出现在列表里，并有一串 **ID** |
 | **2** | 记下扩展 ID | 仍在 `chrome://extensions`，复制该扩展的 ID | （无文件） |
-| **3** | 安装 Native Host | 在 webnginx-native 目录执行下行命令（把 ID 换成你的） | Chrome Native Messaging 配置；缺依赖时会 `npm install`。**不**生成 CA、**不**写入钥匙串 |
+| **3** | 安装 Native Host | 在 webnginx-native 目录执行下行命令（把 ID 换成你的） | Chrome Native Messaging 配置；缺依赖时会 `npm install`。**不**生成 CA、**不**写入系统信任 |
 | **4** | 刷新扩展 | 回到 `chrome://extensions`，点 WebNginx 的 **重新加载** | 扩展重新读到刚装的 host 绑定 |
 | **5** | 打开设置并写一条 MITM 规则 | 扩展 → **Options**；或弹窗进设置。加一个 `server`：填 `server_name`，Location 勾 Active，Directives 写纯 `proxy_pass …;`（不要同条再写 `rewrite`/`return`） | （仅编辑区，尚未生效） |
-| **6** | 打开总开关并保存 | 工具栏弹窗打开 **Enable Active Rules**；设置页点 **Save and Sync** | 启动 host、监听端口；**首次**会在 `~/.webnginx/` 生成 `ca.crt` / `ca.key`（叶证书只在内存，不进系统） |
-| **7** | 信任本地 CA（HTTPS 必做） | 确认 `~/.webnginx/ca.crt` 已存在后，在 webnginx-native 目录执行下行命令；按提示输入本机密码 | 把 CA 写入**登录钥匙串**为信任根（`install-host` 不会做这一步） |
-| **8** | 完全退出再开 Chrome | **Cmd+Q** 退出 Chrome（不要只关窗口），再重新打开 | 让 Chrome 重新读取钥匙串信任 |
+| **6** | 打开总开关并保存 | 工具栏弹窗打开 **Enable Active Rules**；设置页点 **Save and Sync** | 启动 host、监听端口；**首次**会在 `~/.webnginx/`（Windows：`%USERPROFILE%\.webnginx\`）生成 `ca.crt` / `ca.key`（有效期 10 年；叶证书只在内存，不进系统） |
+| **7** | 信任本地 CA（HTTPS 必做） | 确认 `ca.crt` 已存在后，在 webnginx-native 目录执行下行命令 | 把 CA 写入本机信任根（`install-host` 不会做这一步） |
+| **8** | 完全退出再开 Chrome | **macOS**：Cmd+Q（只关窗口不够）；**Windows**：完全退出（含托盘图标）后再打开。（Chrome 会缓存系统证书信任） | 让 Chrome 重新读取证书信任 |
 | **9** | 确认成功 | Options → **透明代理状态 · Proxy status**：徽章 **ON**；访问你配置的 `server_name` 域名做验证 | — |
 
 **第 3 步命令（在 `webnginx-native/` 目录）：**
 
 ```bash
+# macOS / Windows（Git Bash）通用入口；Windows 默认用 bash 脚本
 make install-host EXT_ID=你的扩展ID
+
+# Windows 显式指定 shell 实现：
+make install-host EXT_ID=你的扩展ID SHELL_KIND=bash   # install-windows.bash
+make install-host EXT_ID=你的扩展ID SHELL_KIND=sh     # install-windows.sh
+# 或：
+make install-host-bash EXT_ID=你的扩展ID
+make install-host-sh EXT_ID=你的扩展ID
 ```
 
 **第 7 步命令（同上目录）：**
 
 ```bash
 make trust-ca
+
+# Windows 显式指定：
+make trust-ca SHELL_KIND=bash   # trust-ca-windows.bash
+make trust-ca SHELL_KIND=sh     # trust-ca-windows.sh
+# 或：make trust-ca-bash / make trust-ca-sh
 ```
 
-设置页「本地 Host 与 CA」栏有同一套摘要；细节与排错见下文。
+设置页「本地 Host 与 CA」栏有同一套摘要（会按当前 OS 高亮）；细节与排错见下文。
 
 ### 换机 / 换 ID / 重装时
 
 - 扩展 ID 变了（换加载路径、重装未打包扩展等）→ 必须再跑一遍 **第 3 步** `make install-host EXT_ID=…`，然后 **第 4 步** 重新加载扩展
-- 删过 `~/.webnginx/`、换过 CA、或新机首次 HTTPS → 先 Save 一次生成 CA，再 **第 7–8 步** `make trust-ca` + Cmd+Q
+- 删过 `~/.webnginx/`、换过 CA、或新机首次 HTTPS → 先 Save 一次生成 CA，再 **第 7–8 步** `make trust-ca` + 完全退出 Chrome
 - **只改 Listen port** → Save and Sync 即可，不必重生或重信任 CA
 
 ### 停止代理
@@ -93,7 +107,7 @@ make trust-ca
 - 日常：关掉弹窗总开关（清空 PAC，并断开 native host）
 - 仅停某条：Options 取消 Active 或删除 server，再 Save and Sync
 
-## 卸载干净（macOS）
+## 卸载干净
 
 按顺序做，可只卸扩展、或连 Host / CA / 信任一并清掉。
 
@@ -101,26 +115,36 @@ make trust-ca
 | --- | --- | --- |
 | **1** | 关掉弹窗 **Enable Active Rules** | 清空 PAC、断开 native host，避免残留系统代理设置 |
 | **2** | `chrome://extensions` → 移除 **WebNginx** | 卸掉扩展本身 |
-| **3** | 删除 Native Messaging 注册 | 见下方命令；不删则换 ID 后仍可能指向旧绑定 |
+| **3** | 删除 Native Messaging 注册 | 见下方各平台命令 |
 | **4** | 删除运行时 CA 目录 | `~/.webnginx/`（含 `ca.crt` / `ca.key`） |
-| **5** | 从登录钥匙串移除受信任 CA | 见下一节；**只删文件不会撤销信任** |
+| **5** | 从系统信任存储移除 CA | 见下一节；**只删文件不会撤销信任** |
 | **6** | （可选）删除本仓库 / `webnginx-native/` | 源码与 `node_modules`；不删也不影响系统，只是占磁盘 |
-| **7** | **Cmd+Q** 完全退出 Chrome 再打开 | 让代理与证书信任状态刷新 |
+| **7** | 完全退出 Chrome 再打开 | macOS：Cmd+Q；Windows：含托盘退出 |
 
-**第 3–4 步命令示例：**
+### macOS：第 3–4 步
 
 ```bash
 rm -f "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.webnginx.proxy.json"
 rm -rf "$HOME/.webnginx"
 ```
 
+### Windows：第 3–4 步（Git Bash）
+
+```bash
+reg delete "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.webnginx.proxy" /f
+rm -f webnginx-native/com.webnginx.proxy.json webnginx-native/host-wrapper.cmd
+rm -rf "$HOME/.webnginx"
+```
+
 设置页「卸载与移除信任证书」栏有同一套摘要。
 
-## 移除受信任证书（macOS）
+## 移除受信任证书
 
-`make trust-ca` 会把 **WebNginx Local CA** 写入**登录钥匙串**。卸载时务必手动移除，否则系统仍信任该 CA。
+`make trust-ca` 会把 **WebNginx Local CA** 写入本机信任根。卸载时务必手动移除，否则系统仍信任该 CA。
 
-### 图形界面（推荐）
+### macOS
+
+#### 图形界面（推荐）
 
 1. 打开 **钥匙串访问**（Spotlight 搜「钥匙串访问」/ Keychain Access）
 2. 左侧选 **登录**（login），类别选 **证书**
@@ -129,7 +153,7 @@ rm -rf "$HOME/.webnginx"
 5. 若仍看到信任条目：选中该证书 → 右键「显示简介」→ **信任** → 将「使用此证书时」改回默认后删掉，或确认证书已不在列表中
 6. **Cmd+Q** 退出 Chrome 再打开
 
-### 命令行
+#### 命令行
 
 若 `~/.webnginx/ca.crt` 还在：
 
@@ -145,9 +169,24 @@ security delete-certificate -c "WebNginx Local CA" "$HOME/Library/Keychains/logi
 
 完成后同样 **Cmd+Q** 重开 Chrome。若提示找不到证书，说明钥匙串里已无该项（或名称不同，请用「钥匙串访问」核对）。
 
+### Windows
+
+#### 图形界面（推荐）
+
+1. 运行 `certmgr.msc`
+2. **受信任的根证书颁发机构** → **证书**
+3. 找到 **WebNginx Local CA** → 删除
+4. 完全退出 Chrome（含托盘）再打开
+
+#### 命令行（Git Bash）
+
+```bash
+certutil -user -delstore Root "WebNginx Local CA"
+```
+
 ## 本地 Host 与 CA
 
-仅 MITM（透明 `proxy_pass`）需要 Host；纯 DNR 可不装。从零安装顺序见上文 [从零安装（macOS，新手顺序）](#从零安装macos新手顺序)。
+仅 MITM（透明 `proxy_pass`）需要 Host；纯 DNR 可不装。从零安装顺序见上文 [从零安装](#从零安装)。
 
 ### `webnginx-native/`（源码与安装）
 
@@ -156,16 +195,22 @@ security delete-certificate -c "WebNginx Local CA" "$HOME/Library/Keychains/logi
 | 文件 | 作用 |
 | --- | --- |
 | `host.js` | Native Messaging 入口，接收路由并驱动代理 |
-| `host-wrapper.sh` | 安装时生成；用固定 `node` 路径启动 `host.js` |
+| `host-wrapper.sh` / `host-wrapper.cmd` | 安装时生成；用固定 `node` 路径启动 `host.js` |
 | `proxyServer.js` | 监听 `127.0.0.1:<port>`，HTTPS MITM 与上游转发 |
 | `ca.js` | 本地 CA；按域名签发叶证书 |
 | `routes.js` | 按 Host / 路径匹配路由 |
-| `install-macos.sh` | 写 Chrome Native Messaging manifest（绑定扩展 ID） |
-| `trust-ca-macos.sh` | 将 `~/.webnginx/ca.crt` 加入登录钥匙串 |
+| `install-macos.sh` | macOS：写 Chrome Native Messaging manifest（绑定扩展 ID） |
+| `trust-ca-macos.sh` | macOS：将 `~/.webnginx/ca.crt` 加入登录钥匙串 |
+| `install-windows.sh` | Windows（POSIX sh）：写 manifest + `HKCU` 注册表 |
+| `install-windows.bash` | Windows（bash）：同上 |
+| `trust-ca-windows.sh` | Windows（POSIX sh）：`certutil -user -addstore Root` |
+| `trust-ca-windows.bash` | Windows（bash）：同上 |
 | `package.json` | 依赖；缺 `node_modules` 时安装脚本会 `npm install` |
 
 - Host 名：`com.webnginx.proxy`
-- Manifest：`~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.webnginx.proxy.json`
+- **macOS** Manifest：`~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.webnginx.proxy.json`
+- **Windows**：manifest 写在 `webnginx-native/com.webnginx.proxy.json`，并由注册表  
+  `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.webnginx.proxy` 指向该文件
 - 换扩展 ID / 换机 / 重装后需在 `webnginx-native/` 重新 `make install-host EXT_ID=...`
 
 ### `~/.webnginx/`（运行时 CA）
@@ -183,7 +228,7 @@ security delete-certificate -c "WebNginx Local CA" "$HOME/Library/Keychains/logi
 
 - 默认 `127.0.0.1:17890`；改端口后 **Save and Sync**。
 - **只改端口不必**重生或重信任 CA。
-- 需再 `make trust-ca`（并 Cmd+Q 重开 Chrome）：首次 HTTPS MITM、删除/更换 `~/.webnginx/`、换机、主动换 CA。
+- 需再 `make trust-ca`（并完全退出 Chrome）：首次 HTTPS MITM、删除/更换 `~/.webnginx/`、换机、主动换 CA。
 
 ### 安全
 
@@ -193,8 +238,9 @@ security delete-certificate -c "WebNginx Local CA" "$HOME/Library/Keychains/logi
 ### 常见问题
 
 - 徽章 OFF：`EXT_ID` 是否与当前扩展一致；总开关是否开；是否已 Save 透明代理规则
-- HTTPS 警告：是否已 `make trust-ca`，是否 **Cmd+Q** 完全退出后重开
+- HTTPS 警告：是否已 `make trust-ca`，是否已**完全退出**后重开 Chrome
 - 端口占用：换 Listen port 后 Save；无需动 `~/.webnginx/`
+- Windows：`reg` / `certutil` 找不到 → 请改用 Git Bash，勿在纯 WSL 里安装
 
 ## 开发
 

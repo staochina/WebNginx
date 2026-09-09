@@ -1,3 +1,7 @@
 /.idea
 /target
 webnginx-native/node_modules/
+webnginx-native/host-wrapper.sh
+webnginx-native/host-wrapper.cmd
+webnginx-native/com.webnginx.proxy.json
+

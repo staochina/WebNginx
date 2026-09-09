@@ -1,6 +1,11 @@
 'use strict';
 
-import { debugLog, getProxyPort, DEFAULT_PROXY_PORT } from './common.js';
+import {
+  debugLog,
+  getProxyPort,
+  DEFAULT_PROXY_PORT,
+  chromeQuitHint,
+} from './common.js';
 import { NATIVE_HOST_NAME } from './nginxParser.js';
 import { buildPacScript, hostsFromProxyRoutes } from './pac.js';
 
@@ -176,7 +181,7 @@ function ensureNativeConnected() {
         new Error(
           `Native host not found (${NATIVE_HOST_NAME}). ` +
             `In webnginx-native/ run: make install-host EXT_ID=${chrome.runtime.id} ` +
-            `then fully quit Chrome (Cmd+Q) and reopen. Original: ${error.message}`,
+            `then ${chromeQuitHint()}. Original: ${error.message}`,
         ),
       );
       return;
