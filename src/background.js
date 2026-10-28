@@ -160,16 +160,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-runExclusive(async () => {
-  try {
-    const globalSwitch = await getGlobalSwitch();
-    const iconPath = globalSwitch ? 'img/48.png' : 'img/off.png';
-    await chrome.action.setIcon({ path: iconPath });
-    await updateRules(globalSwitch ? await getDynamicRules() : null);
-    debugLog('initialized', { globalSwitch });
-  } catch (error) {
-    console.error('[WebNginx] Error during initialization:', error);
-  }
+async function applyGlobalSwitchState() {
+  const globalSwitch = await getGlobalSwitch();
+  const iconPath = globalSwitch ? 'img/48.png' : 'img/off.png';
+  await chrome.action.setIcon({ path: iconPath });
+  await updateRules(globalSwitch ? await getDynamicRules() : null);
+  debugLog('initialized', { globalSwitch });
+  return globalSwitch;
+}
+
+function initFromStorage() {
+  return runExclusive(async () => {
+    try {
+      await applyGlobalSwitchState();
+    } catch (error) {
+      console.error('[WebNginx] Error during initialization:', error);
+    }
+  });
+}
+
+initFromStorage();
+chrome.runtime.onStartup.addListener(() => {
+  initFromStorage();
+});
+chrome.runtime.onInstalled.addListener(() => {
+  initFromStorage();
 });
 
 function previewPayload(parsed) {

@@ -254,8 +254,3 @@ make build
 - `make buildc` → `target/webnginx-chrome.zip`（`src/` 下文件，无多余 `src/` 前缀）
 - Native Host：`cd webnginx-native && make install-host EXT_ID=…` / `make trust-ca`
 - 扩展侧共享文本解析：[`src/nginxText.js`](src/nginxText.js)；规则引擎 [`src/nginxParser.js`](src/nginxParser.js)；设置页模型 [`src/configModel.js`](src/configModel.js)
-
-## 需求文档
-
-- [需求沟通纪要](docs/requirements-comms/设置页与透明代理体验-需求沟通纪要.md)
-- [正式需求](docs/requirements-docs/设置页与透明代理体验-需求.md)
