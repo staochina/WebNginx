@@ -274,6 +274,12 @@ function normalizePrefix(prefix) {
   return prefix.startsWith('/') ? prefix : `/${prefix}`;
 }
 
+/** True when proxy_pass includes an explicit URI (nginx: including lone "/"). */
+function proxyPassHasUri(absolute, parsed) {
+  const rest = String(absolute).slice(parsed.origin.length);
+  return rest.startsWith('/');
+}
+
 function locationToRules(location, nextId) {
   const condition = buildCondition(location);
   const rules = [];
@@ -459,12 +465,13 @@ function parseProxyPass(target, location) {
   const targetPath = targetUrl.pathname || '/';
   const locNorm = locationPrefix.replace(/\/$/, '') || '';
   const tgtNorm = targetPath.replace(/\/$/, '') || '';
+  const hasUri = proxyPassHasUri(absolute, targetUrl);
 
-  // No path in proxy_pass, or same path as location → keep full request path (host only).
-  // Fixes wiping `/svr/otb/cube/...` down to `/svr/otb` when path was set as a fixed transform.
+  // nginx: no URI → host only; explicit URI (incl. "/") → replace location prefix.
+  // Same path as location stays host-only (avoids wiping /svr/otb/cube → /svr/otb).
   const hostOnly =
-    targetPath === '/' ||
-    (location.serverNames.length === 1 && locNorm === tgtNorm);
+    !hasUri ||
+    (location.serverNames.length === 1 && locNorm && locNorm === tgtNorm);
 
   if (hostOnly) {
     return { payload: { transform }, destination: targetUrl };

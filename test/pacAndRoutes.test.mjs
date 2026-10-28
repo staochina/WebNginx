@@ -49,6 +49,36 @@ test('buildUpstreamUrl host-only keeps request path', () => {
   assert.equal(url.href, 'http://localhost:8088/svr/otb/cube/1?x=1');
 });
 
+test('buildUpstreamUrl without URI keeps full request path', () => {
+  const route = {
+    matchType: 'prefix',
+    pattern: '/core-crane/',
+    upstream: 'http://localhost:11000',
+  };
+  const url = buildUpstreamUrl(route, '/core-crane/api/x?a=1');
+  assert.equal(url.href, 'http://localhost:11000/core-crane/api/x?a=1');
+});
+
+test('buildUpstreamUrl with URI / strips location prefix like nginx', () => {
+  const route = {
+    matchType: 'prefix',
+    pattern: '/core-crane/',
+    upstream: 'http://localhost:11000/',
+  };
+  const url = buildUpstreamUrl(route, '/core-crane/api/x?a=1');
+  assert.equal(url.href, 'http://localhost:11000/api/x?a=1');
+});
+
+test('buildUpstreamUrl with URI / strips to upstream root', () => {
+  const route = {
+    matchType: 'prefix',
+    pattern: '/core-crane/',
+    upstream: 'http://localhost:11000/',
+  };
+  const url = buildUpstreamUrl(route, '/core-crane/');
+  assert.equal(url.href, 'http://localhost:11000/');
+});
+
 test('buildUpstreamUrl rewrites location prefix', () => {
   const route = {
     matchType: 'prefix',

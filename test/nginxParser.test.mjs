@@ -174,3 +174,42 @@ server {
   assert.ok(dnrRules.length >= 1);
   assert.ok(dnrRules.some((r) => r.action.type === 'redirect'));
 });
+
+test('MITM proxy_pass keeps trailing-slash URI on upstream string', () => {
+  const config = `
+server {
+    server_name app.example.com;
+    location /core-crane/ {
+        proxy_pass http://localhost:11000/;
+    }
+}
+`;
+  const { dnrRules, proxyRoutes } = parseWebNginxConfig(config);
+  assert.equal(dnrRules.length, 0);
+  assert.equal(proxyRoutes.length, 1);
+  assert.equal(proxyRoutes[0].upstream, 'http://localhost:11000/');
+});
+
+test('DNR fallback proxy_pass with URI / strips location prefix', () => {
+  // rewrite forces DNR path; proxy_pass last wins and applies nginx URI replace.
+  const config = `
+server {
+    server_name app.example.com;
+    location /core-crane/ {
+        rewrite ^https://unused\\.example/(.*)$ http://unused/$1 break;
+        proxy_pass http://localhost:11000/;
+    }
+}
+`;
+  const { dnrRules, proxyRoutes } = parseWebNginxConfig(config);
+  assert.equal(proxyRoutes.length, 0);
+  const redirect = dnrRules.find((r) => r.action.type === 'redirect');
+  assert.ok(redirect);
+  assert.equal(redirect.action.redirect.transform.host, 'localhost');
+  assert.equal(redirect.action.redirect.transform.port, '11000');
+  assert.equal(redirect.action.redirect.transform.path, '/\\1');
+  assert.equal(
+    redirect.condition.regexFilter,
+    '^https?://app\\.example\\.com/core-crane/(.*)$',
+  );
+});

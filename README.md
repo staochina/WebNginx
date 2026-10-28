@@ -44,6 +44,8 @@ server {
 
 上例走 MITM。若同 Location 再写 `rewrite` / `return`，整条退回 DNR。
 
+`proxy_pass` 路径语义对齐 nginx：无 URI 时保留原请求路径；带 URI（含单独的 `/`）时用该 URI **替换** location 前缀。例如 `location /core-crane/ { proxy_pass http://127.0.0.1:11000/; }` 会把 `/core-crane/api` 转到 `http://127.0.0.1:11000/api`。
+
 ## 从零安装
 
 纯 DNR（`rewrite` / `return` / 改 Header）**只需第 1 步加载扩展**（可以从谷歌应用商店安装 WebNginx，或本地加载）。只有要用透明 `proxy_pass`（MITM）时，才需要后面的 Native Host 与 CA。

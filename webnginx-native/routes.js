@@ -84,10 +84,13 @@ export function buildUpstreamUrl(route, reqPath) {
   const target = new URL(absolute);
   const locationPrefix = normalizePrefix(route.pattern);
   const targetPath = target.pathname || '/';
+  const hasUri = proxyPassHasUri(absolute, target);
 
   const locNorm = locationPrefix.replace(/\/$/, '') || '';
   const tgtNorm = targetPath.replace(/\/$/, '') || '';
-  const hostOnly = targetPath === '/' || (locNorm && locNorm === tgtNorm);
+  // nginx: no URI → pass full request URI; URI present → replace location prefix.
+  // Same-path (ignoring trailing slash) stays host-only for backwards compatibility.
+  const hostOnly = !hasUri || (locNorm && locNorm === tgtNorm);
 
   if (hostOnly) {
     target.pathname = pathname;
@@ -112,6 +115,19 @@ export function buildUpstreamUrl(route, reqPath) {
   target.pathname = pathname;
   target.search = search;
   return target;
+}
+
+/**
+ * nginx treats proxy_pass with an explicit URI (including lone "/") differently
+ * from host-only proxy_pass. new URL() collapses both to pathname "/", so detect
+ * from the raw string after origin.
+ * @param {string} absolute
+ * @param {URL} parsed
+ * @returns {boolean}
+ */
+function proxyPassHasUri(absolute, parsed) {
+  const rest = String(absolute).slice(parsed.origin.length);
+  return rest.startsWith('/');
 }
 
 function normalizePrefix(prefix) {
